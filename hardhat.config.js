@@ -28,19 +28,8 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: {
-      base: BASESCAN_API_KEY || "",
-    },
-    customChains: [
-      {
-        network: "base",
-        chainId: 8453,
-        urls: {
-          apiURL: "https://api.basescan.org/api",
-          browserURL: "https://basescan.org",
-        },
-      },
-    ],
+    // Etherscan API v2: one key works for Base via chainId
+    apiKey: BASESCAN_API_KEY || "",
   },
   sourcify: {
     enabled: false,

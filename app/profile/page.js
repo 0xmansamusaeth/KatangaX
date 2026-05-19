@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { MyVaultsList } from "@/components/profile/MyVaultsList";
 import { PaymentMethodsCard } from "@/components/profile/PaymentMethodsCard";
+import { Web3WalletSection } from "@/components/web3/Web3WalletSection";
 import { ProfileHero } from "@/components/profile/ProfileHero";
 import { StatsGrid } from "@/components/profile/StatsGrid";
 import { TrustScoreCard } from "@/components/profile/TrustScoreCard";
@@ -79,6 +80,8 @@ export default function ProfilePage() {
         />
 
         <PaymentMethodsCard />
+
+        <Web3WalletSection />
 
         <MyVaultsList vaults={myVaults} />
 

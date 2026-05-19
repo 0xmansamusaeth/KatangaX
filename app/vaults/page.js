@@ -16,7 +16,10 @@ export default function VaultsPage() {
 
   return (
     <PageWrapper title="Vaults">
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex justify-end gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/vaults/registry">Registry</Link>
+        </Button>
         <Button variant="accent" size="sm" asChild>
           <Link href="/vaults/new" className="gap-1">
             <Plus className="h-4 w-4" />

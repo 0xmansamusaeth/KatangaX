@@ -4,9 +4,13 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, Clock, Star, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
+import { Web3ContributeSheet } from "@/components/web3/Web3ContributeSheet";
+import { Web3DisbursementPanel } from "@/components/web3/Web3DisbursementPanel";
 import { ContributeNowSheet } from "@/components/vaults/ContributeNowSheet";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
+import { useOnChainVaultData } from "@/lib/web3/hooks/useOnChainVaultData";
+import { useWalletConnection } from "@/lib/web3/hooks/useWalletConnection";
 import {
   cn,
   getTrustScore,
@@ -23,6 +27,11 @@ export function OverviewTab({ vault }) {
   const { user } = useUser();
   const { markContribution } = useVaults();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { isConnected, isBase } = useWalletConnection();
+  const chain = useOnChainVaultData(vault.contractAddress);
+
+  const isUsdcVault =
+    vault.paymentMethod === "usdc" && Boolean(vault.contractAddress);
 
   const userMember = useMemo(
     () => vault.members?.find((m) => m.userId === user.id) ?? null,
@@ -33,14 +42,28 @@ export function OverviewTab({ vault }) {
   const statuses = vault.paymentStatusesByRound?.[currentRoundKey] ?? {};
   const userStatus = userMember ? statuses[userMember.id] : null;
 
+  const paidOnChain = isUsdcVault && chain.member?.paidThisRound;
   const showContributeButton =
-    vault.status === "active" && userMember && userStatus !== "paid";
+    vault.status === "active" &&
+    userMember &&
+    userStatus !== "paid" &&
+    !paidOnChain;
+
+  const web3Ready = isUsdcVault && isConnected && isBase;
 
   const confirmPayment = () => {
     if (!userMember) return;
     markContribution(vault.id, userMember.id, vault.currentRound, "paid");
     setSheetOpen(false);
     toast("Contribution confirmed. Thank you!");
+  };
+
+  const onWeb3Success = () => {
+    if (!userMember) return;
+    markContribution(vault.id, userMember.id, vault.currentRound, "paid");
+    setSheetOpen(false);
+    chain.refetch();
+    toast("Contribution confirmed on Base ✅", { variant: "success" });
   };
 
   return (
@@ -51,16 +74,27 @@ export function OverviewTab({ vault }) {
           size="lg"
           className="w-full"
           onClick={() => setSheetOpen(true)}
+          disabled={isUsdcVault && !web3Ready}
         >
           Contribute Now
         </Button>
       ) : null}
 
-      {userMember && userStatus === "paid" ? (
+      {isUsdcVault && !isConnected ? (
+        <p className="text-center text-xs text-[#6B7280]">
+          Connect your Base wallet to contribute with USDC.
+        </p>
+      ) : null}
+
+      {(userMember && userStatus === "paid") || paidOnChain ? (
         <div className="flex items-center gap-2 rounded-xl border border-[#16A34A]/30 bg-[#16A34A]/10 p-3 text-sm font-medium text-[#166534]">
           <CheckCircle2 className="h-5 w-5" />
           You’ve paid this round.
         </div>
+      ) : null}
+
+      {isUsdcVault ? (
+        <Web3DisbursementPanel vault={vault} user={user} />
       ) : null}
 
       <section className="space-y-2">
@@ -131,12 +165,21 @@ export function OverviewTab({ vault }) {
         </ul>
       </section>
 
-      <ContributeNowSheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        vault={vault}
-        onConfirm={confirmPayment}
-      />
+      {isUsdcVault ? (
+        <Web3ContributeSheet
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          vault={vault}
+          onSuccess={onWeb3Success}
+        />
+      ) : (
+        <ContributeNowSheet
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          vault={vault}
+          onConfirm={confirmPayment}
+        />
+      )}
     </div>
   );
 }

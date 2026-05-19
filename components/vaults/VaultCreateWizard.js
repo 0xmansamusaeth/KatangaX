@@ -25,6 +25,17 @@ import {
 } from "@/components/vaults/MemberPicker";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
+import { ConnectWalletInline } from "@/components/web3/ConnectWalletButton";
+import { TransactionStatus } from "@/components/web3/TransactionStatus";
+import { useCreateVault } from "@/lib/web3/hooks/useCreateVault";
+import { useUSDCBalance } from "@/lib/web3/hooks/useUSDCBalance";
+import { useWalletConnection } from "@/lib/web3/hooks/useWalletConnection";
+import {
+  buildOnChainMemberAddresses,
+  frequencyToRoundDays,
+  parseUsdc,
+  truncateAddress,
+} from "@/lib/web3/utils";
 import {
   formatCurrency,
   formatDate,
@@ -43,6 +54,21 @@ const FREQUENCY_OPTIONS = [
   { value: "week", label: "Weekly" },
   { value: "biweek", label: "Bi-weekly" },
   { value: "month", label: "Monthly" },
+];
+
+const PAYMENT_METHODS = [
+  {
+    value: "mobile_money",
+    emoji: "💳",
+    label: "Mobile Money",
+    description: "MTN, Airtel Money",
+  },
+  {
+    value: "usdc",
+    emoji: "🔷",
+    label: "USDC on Base",
+    description: "Pay with your Base wallet",
+  },
 ];
 
 const PAYOUT_METHODS = [
@@ -125,6 +151,7 @@ export function VaultCreateWizard() {
     amount: "",
     frequency: "month",
     memberCount: 10,
+    paymentMethod: "mobile_money",
     payoutMethod: "random",
     // Initialized client-side in the effect below to avoid SSR/CSR
     // timezone drift on `todayIsoDate()`.
@@ -134,6 +161,20 @@ export function VaultCreateWizard() {
   const [addedMembers, setAddedMembers] = useState(/** @type {any[]} */ ([]));
   const [agreed, setAgreed] = useState(false);
   const [showMismatch, setShowMismatch] = useState(false);
+  const [deploying, setDeploying] = useState(false);
+  const [deployedAddress, setDeployedAddress] = useState("");
+  const [pendingDeploy, setPendingDeploy] = useState(null);
+
+  const { address, isConnected, isBase } = useWalletConnection();
+  const { formatted: usdcBalance, balance: usdcBalanceRaw } = useUSDCBalance();
+  const {
+    createVault: deployVault,
+    status: deployStatus,
+    txHash: deployTxHash,
+    error: deployError,
+    isSuccess: deploySuccess,
+    resolveVaultFromReceipt,
+  } = useCreateVault();
   const [today, setToday] = useState("");
   const [touched, setTouched] = useState({
     name: false,
@@ -224,12 +265,7 @@ export function VaultCreateWizard() {
 
   const handleBack = () => setStep((s) => Math.max(0, s - 1));
 
-  const submit = () => {
-    if (!agreed) {
-      toast("Please accept the Vault Terms to continue", { variant: "error" });
-      return;
-    }
-    const id = `vault-${Date.now()}`;
+  const finishLocalVault = (id, contractAddress, memberWallets) => {
     const amount = Number(form.amount);
     const memberCount = form.memberCount;
 
@@ -242,6 +278,7 @@ export function VaultCreateWizard() {
       phone: user.phone,
       payoutOrder: 1,
       agreementAccepted: true,
+      walletAddress: memberWallets?.[0],
     };
 
     const invitedMembers = addedMembers.map((m, idx) => ({
@@ -252,9 +289,22 @@ export function VaultCreateWizard() {
       phone: m.phone,
       payoutOrder: idx + 2,
       agreementAccepted: false,
+      walletAddress: memberWallets?.[idx + 1],
     }));
 
     const members = [creator, ...invitedMembers];
+    while (members.length < memberCount) {
+      const order = members.length + 1;
+      members.push({
+        id: `${id}-pad-${order}`,
+        name: `Member ${order}`,
+        initials: "M",
+        avatarColor: "#6B7280",
+        payoutOrder: order,
+        agreementAccepted: false,
+        walletAddress: memberWallets?.[order - 1],
+      });
+    }
 
     const paymentStatusesByRound = {
       1: Object.fromEntries(members.map((m) => [m.id, "pending"])),
@@ -267,6 +317,8 @@ export function VaultCreateWizard() {
       memberCount,
       contributionAmount: amount,
       contributionPeriod: form.frequency,
+      paymentMethod: form.paymentMethod,
+      contractAddress: contractAddress || undefined,
       currentRound: 1,
       totalRounds: memberCount,
       status: "active",
@@ -280,9 +332,79 @@ export function VaultCreateWizard() {
       paymentStatusesByRound,
     });
 
-    toast("Vault created! Invites sent to members.");
+    if (contractAddress) {
+      toast(`Vault deployed! Contract: ${truncateAddress(contractAddress)}`, {
+        variant: "success",
+      });
+    } else {
+      toast("Vault created! Invites sent to members.");
+    }
     router.push(`/vaults/${id}`);
   };
+
+  const submit = async () => {
+    if (!agreed) {
+      toast("Please accept the Vault Terms to continue", { variant: "error" });
+      return;
+    }
+
+    const id = `vault-${Date.now()}`;
+
+    if (form.paymentMethod === "usdc") {
+      if (!isConnected || !isBase || !address) {
+        toast("Connect your Base wallet first", { variant: "error" });
+        return;
+      }
+      if (form.memberCount < 3) {
+        toast("On-chain vaults need at least 3 members", { variant: "error" });
+        return;
+      }
+      const amountAtomic = parseUsdc(form.amount);
+      if (usdcBalanceRaw != null && usdcBalanceRaw < amountAtomic) {
+        toast("Insufficient USDC balance for this vault", { variant: "error" });
+        return;
+      }
+
+      const memberWallets = buildOnChainMemberAddresses(
+        address,
+        addedMembers,
+        form.memberCount,
+      );
+
+      setDeploying(true);
+      setPendingDeploy({ id, memberWallets });
+      try {
+        await deployVault({
+          vaultName: form.name.trim(),
+          members: memberWallets,
+          contributionAmount: amountAtomic,
+          roundDurationDays: frequencyToRoundDays(form.frequency),
+        });
+      } catch {
+        setPendingDeploy(null);
+        setDeploying(false);
+        toast(deployError ?? "Vault deployment failed", { variant: "error" });
+      }
+      return;
+    }
+
+    finishLocalVault(id, undefined, undefined);
+  };
+
+  useEffect(() => {
+    if (!deploySuccess || !pendingDeploy) return;
+    const contractAddress = resolveVaultFromReceipt();
+    if (!contractAddress) return;
+    setDeployedAddress(contractAddress);
+    finishLocalVault(
+      pendingDeploy.id,
+      contractAddress,
+      pendingDeploy.memberWallets,
+    );
+    setPendingDeploy(null);
+    setDeploying(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- finishLocalVault closes over form state
+  }, [deploySuccess, pendingDeploy, resolveVaultFromReceipt]);
 
   return (
     <div className="space-y-5">
@@ -298,6 +420,11 @@ export function VaultCreateWizard() {
           errors={errors}
           touched={touched}
           onBlur={markTouched}
+          isConnected={isConnected}
+          isBase={isBase}
+          walletAddress={address}
+          usdcBalance={usdcBalance}
+          usdcBalanceRaw={usdcBalanceRaw}
         />
       ) : null}
 
@@ -326,6 +453,10 @@ export function VaultCreateWizard() {
           agreed={agreed}
           onAgreed={setAgreed}
           onEditStep={setStep}
+          deploying={deploying}
+          deployStatus={deployStatus}
+          deployTxHash={deployTxHash}
+          deployedAddress={deployedAddress}
         />
       ) : null}
 
@@ -355,10 +486,10 @@ export function VaultCreateWizard() {
             type="button"
             className="flex-1 gap-1"
             onClick={submit}
-            disabled={!agreed}
+            disabled={!agreed || deploying}
           >
             <CheckCircle2 className="h-4 w-4" />
-            Create Vault
+            {deploying ? "Deploying…" : "Create Vault"}
           </Button>
         )}
       </div>
@@ -375,6 +506,11 @@ function StepDetails({
   errors,
   touched,
   onBlur,
+  isConnected,
+  isBase,
+  walletAddress,
+  usdcBalance,
+  usdcBalanceRaw,
 }) {
   const showErr = (field) => touched[field] && errors[field];
 
@@ -398,10 +534,70 @@ function StepDetails({
       </FieldShell>
 
       <FieldShell>
+        <Label>Payment Method</Label>
+        <div className="space-y-2">
+          {PAYMENT_METHODS.map((opt) => {
+            const active = form.paymentMethod === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onChange({ paymentMethod: opt.value })}
+                className={
+                  "flex w-full items-start gap-3 rounded-xl border-2 bg-white p-3 text-left transition-colors " +
+                  (active
+                    ? "border-[#1B5E20] bg-[#1B5E20]/[0.03]"
+                    : "border-border")
+                }
+              >
+                <span className="text-xl leading-none">{opt.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#1A1A1A]">
+                    {opt.label}
+                  </p>
+                  <p className="text-xs text-[#6B7280]">{opt.description}</p>
+                </div>
+                <span
+                  className={
+                    "mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 " +
+                    (active
+                      ? "border-[#1B5E20] bg-[#1B5E20]"
+                      : "border-[#D1D5DB] bg-white")
+                  }
+                >
+                  {active ? (
+                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {form.paymentMethod === "usdc" && !isConnected ? (
+          <div className="rounded-xl border border-[#FFC107]/50 bg-[#FFFBEB] p-3 text-sm text-[#92400E]">
+            Connect your Base wallet to use USDC.
+            <ConnectWalletInline />
+          </div>
+        ) : null}
+        {form.paymentMethod === "usdc" && isConnected && isBase ? (
+          <div className="rounded-xl border border-[#16A34A]/30 bg-[#16A34A]/10 p-3 text-sm text-[#166534]">
+            <p className="font-mono text-xs">{truncateAddress(walletAddress)}</p>
+            <p className="mt-1 font-semibold">{usdcBalance}</p>
+            {usdcBalanceRaw != null &&
+            parseUsdc(form.amount || "0") > usdcBalanceRaw ? (
+              <p className="mt-2 text-xs text-[#DC2626]">
+                Insufficient USDC balance for this vault
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </FieldShell>
+
+      <FieldShell>
         <Label htmlFor="vault-amount">Contribution Amount</Label>
         <div className="relative">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#1B5E20]">
-            ZMW
+            {form.paymentMethod === "usdc" ? "USDC" : "ZMW"}
           </span>
           <Input
             id="vault-amount"
@@ -663,7 +859,18 @@ function StepMembers({
   );
 }
 
-function StepReview({ form, addedMembers, user, agreed, onAgreed, onEditStep }) {
+function StepReview({
+  form,
+  addedMembers,
+  user,
+  agreed,
+  onAgreed,
+  onEditStep,
+  deploying,
+  deployStatus,
+  deployTxHash,
+  deployedAddress,
+}) {
   const youChip = {
     id: "you",
     name: `${user.name.split(" ")[0]} (You)`,
@@ -673,17 +880,47 @@ function StepReview({ form, addedMembers, user, agreed, onAgreed, onEditStep }) 
   };
   const allMembers = [youChip, ...addedMembers];
   const pretty = PAYOUT_METHODS.find((p) => p.value === form.payoutMethod);
+  const payment = PAYMENT_METHODS.find((p) => p.value === form.paymentMethod);
 
   return (
     <div className="space-y-4">
+      {deploying || deployStatus === "pending" ? (
+        <div className="space-y-3 rounded-xl border border-border bg-white p-4">
+          <p className="text-sm font-semibold text-[#1A1A1A]">
+            Deploying vault contract…
+          </p>
+          <p className="text-xs text-[#6B7280]">
+            Waiting for confirmation on Base…
+          </p>
+          <TransactionStatus
+            status={deployStatus}
+            txHash={deployTxHash}
+            message="Deploying vault contract on Base…"
+          />
+        </div>
+      ) : null}
+      {deployedAddress ? (
+        <p className="rounded-xl bg-[#16A34A]/10 p-3 text-sm text-[#166534]">
+          Vault deployed! Contract: {truncateAddress(deployedAddress)}
+        </p>
+      ) : null}
+
       <SummaryCard
         title="Vault details"
         onEdit={() => onEditStep(0)}
       >
         <SummaryRow label="Name" value={form.name || "—"} />
         <SummaryRow
+          label="Payment"
+          value={`${payment?.emoji ?? ""} ${payment?.label ?? form.paymentMethod}`}
+        />
+        <SummaryRow
           label="Contribution"
-          value={`${formatCurrency(Number(form.amount) || 0)} · ${getPeriodLabel(form.frequency)}`}
+          value={
+            form.paymentMethod === "usdc"
+              ? `${form.amount || 0} USDC · ${getPeriodLabel(form.frequency)}`
+              : `${formatCurrency(Number(form.amount) || 0)} · ${getPeriodLabel(form.frequency)}`
+          }
         />
         <SummaryRow
           label="Members"
@@ -787,3 +1024,4 @@ function SummaryRow({ label, value, multiline }) {
     </div>
   );
 }
+

@@ -17,11 +17,13 @@ import {
   getDuePaymentsForUser,
   getHistoryForUser,
 } from "@/lib/userActivity";
+import { OnChainPaymentsTab } from "@/components/payments/OnChainPaymentsTab";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const TABS = [
   { value: "due", label: "Due" },
   { value: "history", label: "History" },
+  { value: "onchain", label: "On-Chain" },
 ];
 
 const HISTORY_FILTERS = [
@@ -106,13 +108,15 @@ export default function PaymentsPage() {
       <div className="pt-4">
         {tab === "due" ? (
           <DueTab items={due} onPay={onPay} ready={mounted} />
-        ) : (
+        ) : tab === "history" ? (
           <HistoryTab
             items={filteredHistory}
             filter={filter}
             onFilterChange={setFilter}
             totals={totals}
           />
+        ) : (
+          <OnChainPaymentsTab />
         )}
       </div>
 

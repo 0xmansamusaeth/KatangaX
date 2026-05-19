@@ -13,6 +13,7 @@ import { OrganiserActions } from "@/components/vaults/OrganiserActions";
 import { OverviewTab } from "@/components/vaults/OverviewTab";
 import { RulesTab } from "@/components/vaults/RulesTab";
 import { VaultDetailTabs } from "@/components/vaults/VaultDetailTabs";
+import { VaultWeb3Hero } from "@/components/vaults/VaultWeb3Hero";
 import { useMounted } from "@/hooks/useMounted";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
@@ -37,10 +38,31 @@ export default function VaultDetailPage() {
   const [tab, setTab] = useState("overview");
   const mounted = useMounted();
 
-  const vault = useMemo(
-    () => vaults.find((v) => v.id === id),
-    [vaults, id],
-  );
+  const vault = useMemo(() => {
+    const byId = vaults.find((v) => v.id === id);
+    if (byId) return byId;
+    if (typeof id === "string" && id.startsWith("0x")) {
+      const byContract = vaults.find(
+        (v) =>
+          v.contractAddress?.toLowerCase() === id.toLowerCase(),
+      );
+      if (byContract) return byContract;
+      return {
+        id,
+        contractAddress: id,
+        paymentMethod: "usdc",
+        name: "On-chain vault",
+        members: [],
+        currentRound: 1,
+        totalRounds: 1,
+        memberCount: 0,
+        contributionAmount: 0,
+        contributionPeriod: "month",
+        status: "active",
+      };
+    }
+    return null;
+  }, [vaults, id]);
 
   // Before hydration we only have seed vaults; a user-created vault
   // (stored only in localStorage) won't be visible yet. Show a skeleton
@@ -147,10 +169,14 @@ export default function VaultDetailPage() {
             </span>
           ) : null}
           <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#4B5563] shadow-sm">
-            {formatCurrency(vault.contributionAmount)} ·{" "}
-            {getPeriodLabel(vault.contributionPeriod)}
+            {vault.paymentMethod === "usdc"
+              ? `${vault.contributionAmount} USDC`
+              : formatCurrency(vault.contributionAmount)}{" "}
+            · {getPeriodLabel(vault.contributionPeriod)}
           </span>
         </div>
+
+        <VaultWeb3Hero vault={vault} />
       </section>
 
       <VaultDetailTabs tabs={TABS} value={tab} onChange={setTab} />

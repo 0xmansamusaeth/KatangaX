@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
+import { OnChainHistoryList } from "@/components/vaults/OnChainHistoryList";
 import { useUser } from "@/hooks/useUser";
 import {
   formatCurrency,
@@ -17,6 +18,13 @@ const STATUS_META = {
 };
 
 export function HistoryTab({ vault }) {
+  if (vault.contractAddress) {
+    return <OnChainHistoryList vault={vault} />;
+  }
+  return <MockHistoryTab vault={vault} />;
+}
+
+function MockHistoryTab({ vault }) {
   const { user } = useUser();
   const userMember = useMemo(
     () => vault.members?.find((m) => m.userId === user.id) ?? null,
