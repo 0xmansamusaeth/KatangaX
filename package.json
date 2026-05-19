@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "compile": "hardhat compile",
+    "test:contracts": "hardhat test",
+    "deploy:base": "hardhat run scripts/deploy.js --network base"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.0",
@@ -20,9 +23,13 @@
     "tailwind-merge": "^2.5.5"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^4.9.6",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^16.4.7",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
+    "hardhat": "^2.22.18",
     "postcss": "^8.4.49",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.4.15"
