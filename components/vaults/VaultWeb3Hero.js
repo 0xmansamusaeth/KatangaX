@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Copy, ExternalLink } from "lucide-react";
+import { VerifiedContractBadge } from "@/components/web3/VerifiedContractBadge";
 import { useOnChainVaultData } from "@/lib/web3/hooks/useOnChainVaultData";
 import {
   basescanAddressUrl,
@@ -15,7 +16,7 @@ import { toast } from "@/components/ui/toast";
  * @param {{ vault: { contractAddress?: string, contributionAmount?: number } }} props
  */
 export function VaultWeb3Hero({ vault }) {
-  const chain = useVaultContract(vault.contractAddress);
+  const chain = useOnChainVaultData(vault.contractAddress);
 
   if (!vault.contractAddress) return null;
 
@@ -34,6 +35,8 @@ export function VaultWeb3Hero({ vault }) {
 
   return (
     <div className="mt-3 flex w-full flex-col items-center gap-2">
+      <VerifiedContractBadge contractAddress={vault.contractAddress} />
+
       <button
         type="button"
         onClick={copyContract}

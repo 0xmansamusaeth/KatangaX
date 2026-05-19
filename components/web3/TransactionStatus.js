@@ -55,16 +55,16 @@ export function TransactionStatus({
         </div>
       )}
       {status === "success" && (
-        <motionlessSuccess message={message} explorer={explorer} />
+        <TxSuccessBlock message={message} explorer={explorer} />
       )}
       {status === "error" && (
-        <motionlessError message={message} onRetry={onRetry} />
+        <TxErrorBlock message={message} onRetry={onRetry} />
       )}
     </div>
   );
 }
 
-function motionlessSuccess({ message, explorer }) {
+function TxSuccessBlock({ message, explorer }) {
   return (
     <div className="flex items-start gap-3">
       <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#16A34A]" />
@@ -87,7 +87,7 @@ function motionlessSuccess({ message, explorer }) {
   );
 }
 
-function motionlessError({ message, onRetry }) {
+function TxErrorBlock({ message, onRetry }) {
   return (
     <div className="flex items-start gap-3">
       <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#DC2626]" />

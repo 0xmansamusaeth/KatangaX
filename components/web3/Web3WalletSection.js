@@ -1,11 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ConnectWalletButton } from "@/components/web3/ConnectWalletButton";
+import { MobileWalletLinks } from "@/components/web3/MobileWalletLinks";
+import { UsdcOnrampSheet } from "@/components/web3/UsdcOnrampSheet";
+import { Web3OnboardingSheet } from "@/components/web3/Web3OnboardingSheet";
 import { useWalletConnection } from "@/lib/web3/hooks/useWalletConnection";
 import { useUSDCBalance } from "@/lib/web3/hooks/useUSDCBalance";
 import { useWalletOnChainActivity } from "@/lib/web3/hooks/useWalletOnChainActivity";
+import { hasSeenWeb3Onboarding } from "@/lib/web3/web3Prefs";
+import { hasInjectedWallet, isMobileBrowser } from "@/lib/web3/deepLinks";
 import { toast } from "@/components/ui/toast";
 import {
   basescanAddressUrl,
@@ -32,6 +40,15 @@ export function Web3WalletSection() {
   const { formatted } = useUSDCBalance();
   const { disconnect } = useDisconnect();
   const activity = useWalletOnChainActivity();
+  const { openConnectModal } = useConnectModal();
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onrampOpen, setOnrampOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isConnected && !hasSeenWeb3Onboarding()) {
+      setOnboardingOpen(true);
+    }
+  }, [isConnected]);
 
   const copyAddress = async () => {
     if (!address) return;
@@ -43,7 +60,17 @@ export function Web3WalletSection() {
     }
   };
 
+  const startConnect = () => {
+    if (!hasSeenWeb3Onboarding()) {
+      setOnboardingOpen(true);
+      return;
+    }
+    openConnectModal?.();
+  };
+
   if (!isConnected) {
+    const showMobileLinks = isMobileBrowser() && !hasInjectedWallet();
+
     return (
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-[#1A1A1A]">Web3 Wallet</h3>
@@ -61,10 +88,29 @@ export function Web3WalletSection() {
               </p>
             </div>
           </div>
-          <div className="mt-4">
-            <ConnectWalletButton />
+          <div className="mt-4 space-y-2">
+            <Button
+              type="button"
+              className="w-full"
+              variant="outline"
+              onClick={() => setOnboardingOpen(true)}
+            >
+              What is a Base wallet?
+            </Button>
+            <ConnectWalletButton onBeforeConnect={startConnect} />
           </div>
+          {showMobileLinks ? (
+            <div className="mt-3">
+              <MobileWalletLinks />
+            </div>
+          ) : null}
         </div>
+
+        <Web3OnboardingSheet
+          open={onboardingOpen}
+          onClose={() => setOnboardingOpen(false)}
+          onConnect={() => openConnectModal?.()}
+        />
       </section>
     );
   }
@@ -92,6 +138,16 @@ export function Web3WalletSection() {
         </p>
         <p className="text-xs font-medium text-[#6B7280]">USDC on Base</p>
 
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3 w-full"
+          onClick={() => setOnrampOpen(true)}
+        >
+          Get USDC
+        </Button>
+
         <Link
           href={basescanAddressUrl(address) ?? "#"}
           target="_blank"
@@ -109,6 +165,12 @@ export function Web3WalletSection() {
           Disconnect
         </button>
       </div>
+
+      <UsdcOnrampSheet
+        open={onrampOpen}
+        onClose={() => setOnrampOpen(false)}
+        walletAddress={address}
+      />
 
       {activity.isConfigured ? (
         <>

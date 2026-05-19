@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { MobileWalletLinks } from "@/components/web3/MobileWalletLinks";
+import { hasInjectedWallet, isMobileBrowser } from "@/lib/web3/deepLinks";
 import { Copy, ExternalLink, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -28,7 +30,11 @@ function BaseLogo({ className }) {
   );
 }
 
-export function ConnectWalletButton({ className, fullWidth = true }) {
+export function ConnectWalletButton({
+  className,
+  fullWidth = true,
+  onBeforeConnect,
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -44,20 +50,28 @@ export function ConnectWalletButton({ className, fullWidth = true }) {
         const connected = ready && account && chain;
 
         if (!connected) {
+          const showMobile =
+            isMobileBrowser() && !hasInjectedWallet();
           return (
-            <Button
-              type="button"
-              className={
-                (fullWidth ? "w-full " : "") +
-                "gap-2 rounded-xl bg-[#1B5E20] text-white hover:bg-[#145214] " +
-                (className ?? "")
-              }
-              onClick={openConnectModal}
-            >
-              <BaseLogo className="h-5 w-5" />
-              <Wallet className="h-4 w-4" />
-              Connect Base Wallet
-            </Button>
+            <div className={fullWidth ? "w-full space-y-2" : "space-y-2"}>
+              <Button
+                type="button"
+                className={
+                  (fullWidth ? "w-full " : "") +
+                  "gap-2 rounded-xl bg-[#1B5E20] text-white hover:bg-[#145214] " +
+                  (className ?? "")
+                }
+                onClick={() => {
+                  if (onBeforeConnect) onBeforeConnect();
+                  else openConnectModal?.();
+                }}
+              >
+                <BaseLogo className="h-5 w-5" />
+                <Wallet className="h-4 w-4" />
+                Connect Base Wallet
+              </Button>
+              {showMobile ? <MobileWalletLinks /> : null}
+            </div>
           );
         }
 

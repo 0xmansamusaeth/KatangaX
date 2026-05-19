@@ -23,6 +23,8 @@ import {
   MemberChip,
   MemberPicker,
 } from "@/components/vaults/MemberPicker";
+import { WalletMemberPicker } from "@/components/vaults/WalletMemberPicker";
+import { UsdcOnrampSheet } from "@/components/web3/UsdcOnrampSheet";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
 import { ConnectWalletInline } from "@/components/web3/ConnectWalletButton";
@@ -30,8 +32,8 @@ import { TransactionStatus } from "@/components/web3/TransactionStatus";
 import { useCreateVault } from "@/lib/web3/hooks/useCreateVault";
 import { useUSDCBalance } from "@/lib/web3/hooks/useUSDCBalance";
 import { useWalletConnection } from "@/lib/web3/hooks/useWalletConnection";
+import { buildUsdcMemberWalletList } from "@/lib/web3/walletMembers";
 import {
-  buildOnChainMemberAddresses,
   frequencyToRoundDays,
   parseUsdc,
   truncateAddress,
@@ -164,6 +166,7 @@ export function VaultCreateWizard() {
   const [deploying, setDeploying] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState("");
   const [pendingDeploy, setPendingDeploy] = useState(null);
+  const [onrampOpen, setOnrampOpen] = useState(false);
 
   const { address, isConnected, isBase } = useWalletConnection();
   const { formatted: usdcBalance, balance: usdcBalanceRaw } = useUSDCBalance();
@@ -283,13 +286,13 @@ export function VaultCreateWizard() {
 
     const invitedMembers = addedMembers.map((m, idx) => ({
       id: m.id,
-      name: m.name,
-      initials: m.initials,
-      avatarColor: m.avatarColor,
+      name: m.name ?? m.label ?? truncateAddress(m.walletAddress ?? ""),
+      initials: m.initials ?? truncateAddress(m.walletAddress ?? "0x").slice(2, 4).toUpperCase(),
+      avatarColor: m.avatarColor ?? "#6B7280",
       phone: m.phone,
       payoutOrder: idx + 2,
       agreementAccepted: false,
-      walletAddress: memberWallets?.[idx + 1],
+      walletAddress: memberWallets?.[idx + 1] ?? m.walletAddress,
     }));
 
     const members = [creator, ...invitedMembers];
@@ -361,11 +364,12 @@ export function VaultCreateWizard() {
       }
       const amountAtomic = parseUsdc(form.amount);
       if (usdcBalanceRaw != null && usdcBalanceRaw < amountAtomic) {
-        toast("Insufficient USDC balance for this vault", { variant: "error" });
+        setOnrampOpen(true);
+        toast("Insufficient USDC — add funds to continue", { variant: "error" });
         return;
       }
 
-      const memberWallets = buildOnChainMemberAddresses(
+      const memberWallets = buildUsdcMemberWalletList(
         address,
         addedMembers,
         form.memberCount,
@@ -425,6 +429,7 @@ export function VaultCreateWizard() {
           walletAddress={address}
           usdcBalance={usdcBalance}
           usdcBalanceRaw={usdcBalanceRaw}
+          onOpenOnramp={() => setOnrampOpen(true)}
         />
       ) : null}
 
@@ -442,6 +447,7 @@ export function VaultCreateWizard() {
           onDismissMismatch={() => setShowMismatch(false)}
           expectedInvites={expectedInvites}
           user={user}
+          organiserAddress={address}
         />
       ) : null}
 
@@ -493,6 +499,12 @@ export function VaultCreateWizard() {
           </Button>
         )}
       </div>
+
+      <UsdcOnrampSheet
+        open={onrampOpen}
+        onClose={() => setOnrampOpen(false)}
+        walletAddress={address}
+      />
     </div>
   );
 }
@@ -511,6 +523,7 @@ function StepDetails({
   walletAddress,
   usdcBalance,
   usdcBalanceRaw,
+  onOpenOnramp,
 }) {
   const showErr = (field) => touched[field] && errors[field];
 
@@ -583,11 +596,33 @@ function StepDetails({
           <div className="rounded-xl border border-[#16A34A]/30 bg-[#16A34A]/10 p-3 text-sm text-[#166534]">
             <p className="font-mono text-xs">{truncateAddress(walletAddress)}</p>
             <p className="mt-1 font-semibold">{usdcBalance}</p>
+            {usdcBalanceRaw === 0n ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full"
+                onClick={onOpenOnramp}
+              >
+                Get USDC
+              </Button>
+            ) : null}
             {usdcBalanceRaw != null &&
             parseUsdc(form.amount || "0") > usdcBalanceRaw ? (
-              <p className="mt-2 text-xs text-[#DC2626]">
-                Insufficient USDC balance for this vault
-              </p>
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-[#DC2626]">
+                  Insufficient USDC balance for this vault
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={onOpenOnramp}
+                >
+                  Get USDC
+                </Button>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -776,14 +811,26 @@ function StepMembers({
   onDismissMismatch,
   expectedInvites,
   user,
+  organiserAddress,
 }) {
-  const youChip = {
-    id: "you",
-    name: `${user.name.split(" ")[0]} (You)`,
-    initials: getInitials(user.name),
-    avatarColor: user.avatarColor ?? "#1B5E20",
-    locked: true,
-  };
+  const isUsdc = form.paymentMethod === "usdc";
+  const youChip = isUsdc
+    ? {
+        id: "you",
+        name: organiserAddress
+          ? `${truncateAddress(organiserAddress)} (You)`
+          : "You (organiser)",
+        initials: "YO",
+        avatarColor: user.avatarColor ?? "#1B5E20",
+        locked: true,
+      }
+    : {
+        id: "you",
+        name: `${user.name.split(" ")[0]} (You)`,
+        initials: getInitials(user.name),
+        avatarColor: user.avatarColor ?? "#1B5E20",
+        locked: true,
+      };
 
   const totalAdded = addedMembers.length + 1;
 
@@ -809,19 +856,46 @@ function StepMembers({
         <div className="flex flex-wrap gap-2 pt-1">
           <MemberChip member={youChip} />
           {addedMembers.map((m) => (
-            <MemberChip key={m.id} member={m} onRemove={onRemove} />
+            <MemberChip
+              key={m.id}
+              member={
+                isUsdc
+                  ? {
+                      ...m,
+                      name: m.label ?? truncateAddress(m.walletAddress ?? ""),
+                      initials: truncateAddress(m.walletAddress ?? "0x")
+                        .slice(2, 4)
+                        .toUpperCase(),
+                      avatarColor: "#6B7280",
+                    }
+                  : m
+              }
+              onRemove={onRemove}
+            />
           ))}
         </div>
       </FieldShell>
 
-      <FieldShell>
-        <Label>Suggested</Label>
-        <MemberPicker
-          addedIds={addedMembers.map((m) => m.id)}
-          onAdd={onAdd}
-          onRemove={onRemove}
-        />
-      </FieldShell>
+      {isUsdc ? (
+        <FieldShell>
+          <WalletMemberPicker
+            addedMembers={addedMembers}
+            onAdd={onAdd}
+            onRemove={onRemove}
+            organiserAddress={organiserAddress}
+            maxMembers={form.memberCount}
+          />
+        </FieldShell>
+      ) : (
+        <FieldShell>
+          <Label>Suggested</Label>
+          <MemberPicker
+            addedIds={addedMembers.map((m) => m.id)}
+            onAdd={onAdd}
+            onRemove={onRemove}
+          />
+        </FieldShell>
+      )}
 
       {showMismatch ? (
         <div className="rounded-xl border border-[#FFC107] bg-[#FFFBEB] p-3 text-sm text-[#92400E]">
