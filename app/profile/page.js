@@ -12,6 +12,7 @@ import { Web3WalletSection } from "@/components/web3/Web3WalletSection";
 import { ProfileHero } from "@/components/profile/ProfileHero";
 import { StatsGrid } from "@/components/profile/StatsGrid";
 import { TrustScoreCard } from "@/components/profile/TrustScoreCard";
+import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
 import { getProfileAggregates } from "@/lib/userActivity";
@@ -37,19 +38,11 @@ export default function ProfilePage() {
 
   const trustScore = getTrustScore(user.id);
 
-  const onLogout = () => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          "katangax:session",
-          JSON.stringify({ loggedOutAt: new Date().toISOString() }),
-        );
-      }
-    } catch {
-      /* ignore */
-    }
-    toast("Logged out on this device.", { variant: "info" });
-    router.push("/dashboard");
+  const onLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    toast("Signed out", { variant: "info" });
+    router.push("/onboarding");
   };
 
   return (

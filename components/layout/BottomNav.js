@@ -15,6 +15,14 @@ const tabs = [
 export function BottomNav() {
   const pathname = usePathname();
 
+  if (
+    pathname === "/onboarding" ||
+    pathname.startsWith("/onboarding/") ||
+    pathname === "/connect-wallet"
+  ) {
+    return null;
+  }
+
   return (
     <nav
       className="fixed bottom-0 left-1/2 z-50 w-full max-w-[430px] -translate-x-1/2 border-t border-[#E5E7EB] bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.06)]"

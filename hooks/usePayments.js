@@ -1,25 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getState, subscribe, updateState } from "@/lib/store";
-import { getSeedState } from "@/lib/mockData";
+import { useMemo } from "react";
+import { useVaults } from "@/hooks/useVaults";
+import { useProfile } from "@/hooks/useProfile";
 
+/**
+ * Payment dues derived from vault membership (replaces mock payments store).
+ */
 export function usePayments() {
-  const [payments, setPayments] = useState(() => getSeedState().payments);
+  const { vaults, loading: vaultsLoading, refetch } = useVaults();
+  const { profile, loading: profileLoading } = useProfile();
 
-  useEffect(() => {
-    setPayments(getState().payments);
-    return subscribe(() => setPayments(getState().payments));
-  }, []);
-
-  const updatePayment = useCallback((paymentId, patch) => {
-    updateState((prev) => ({
-      ...prev,
-      payments: prev.payments.map((p) =>
-        p.id === paymentId ? { ...p, ...patch } : p,
-      ),
-    }));
-  }, []);
+  const payments = useMemo(() => {
+    if (!profile?.id) return [];
+    const list = [];
+    for (const v of vaults) {
+      if (v.status !== "active") continue;
+      const myMember = v.members?.find(
+        (m) => m.userId === profile.id || m.walletAddress === profile.walletAddress,
+      );
+      if (!myMember) continue;
+      list.push({
+        id: `${v.id}-r${v.currentRound}`,
+        vaultId: v.id,
+        vaultName: v.name,
+        memberId: myMember.id,
+        round: v.currentRound,
+        amount: v.contributionAmount,
+        status: "pending",
+        dueDate: v.startDate || new Date().toISOString().slice(0, 10),
+        currency: v.paymentMethod === "usdc" ? "USDC" : "ZMW",
+      });
+    }
+    return list;
+  }, [vaults, profile?.id, profile?.walletAddress]);
 
   const summary = useMemo(() => {
     const paid = payments.filter((p) => p.status === "paid").length;
@@ -28,5 +42,11 @@ export function usePayments() {
     return { paid, pending, late, total: payments.length };
   }, [payments]);
 
-  return { payments, updatePayment, summary };
+  return {
+    payments,
+    loading: vaultsLoading || profileLoading,
+    summary,
+    refetch,
+    updatePayment: async () => ({ ok: true }),
+  };
 }

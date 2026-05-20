@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MEMBERS_POOL } from "@/lib/mockData";
+import { useSearch } from "@/hooks/useSearch";
 
 /**
  * @param {{
@@ -23,20 +23,12 @@ export function MemberPicker({
   limit = 8,
 }) {
   const [query, setQuery] = useState("");
+  const { results, loading } = useSearch(query);
 
-  const suggestions = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const exclude = new Set([...excludeIds, ...addedIds]);
-    return MEMBERS_POOL.filter((m) => !exclude.has(m.id))
-      .filter((m) => {
-        if (!q) return true;
-        return (
-          m.name.toLowerCase().includes(q) ||
-          m.phone.replace(/\s/g, "").includes(q.replace(/\s/g, ""))
-        );
-      })
-      .slice(0, limit);
-  }, [query, excludeIds, addedIds, limit]);
+  const exclude = new Set([...excludeIds, ...addedIds]);
+  const suggestions = results
+    .filter((m) => !exclude.has(m.id))
+    .slice(0, limit);
 
   return (
     <div className="space-y-3">
@@ -45,15 +37,19 @@ export function MemberPicker({
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Add by phone or name"
+          placeholder="Search by username"
           className="pl-9"
           aria-label="Search members"
         />
       </div>
 
-      {suggestions.length === 0 ? (
+      {loading ? (
+        <p className="text-center text-xs text-[#6B7280]">Searching…</p>
+      ) : suggestions.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border bg-white px-3 py-4 text-center text-xs text-[#6B7280]">
-          No more matches in your contacts.
+          {query.length >= 2
+            ? "No profiles found."
+            : "Type at least 2 characters to search."}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -72,14 +68,25 @@ export function MemberPicker({
                 <p className="truncate text-sm font-medium text-[#1A1A1A]">
                   {m.name}
                 </p>
-                <p className="truncate text-xs text-[#6B7280]">{m.phone}</p>
+                <p className="truncate text-xs text-[#6B7280]">
+                  @{m.username}
+                </p>
               </div>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 className="shrink-0 gap-1 border-[#1B5E20] text-[#1B5E20] hover:bg-[#1B5E20]/5"
-                onClick={() => onAdd?.(m)}
+                onClick={() =>
+                  onAdd?.({
+                    id: m.id,
+                    name: m.name,
+                    initials: m.initials,
+                    avatarColor: m.avatarColor,
+                    userId: m.id,
+                    walletAddress: m.walletAddress,
+                  })
+                }
               >
                 <UserPlus className="h-4 w-4" />
                 Add

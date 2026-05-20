@@ -18,7 +18,6 @@ import { usePayments } from "@/hooks/usePayments";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
-import { updateState } from "@/lib/store";
 import { formatDate, getTimeBasedGreeting } from "@/lib/utils";
 
 function sumTotalSaved(vaults) {
@@ -55,18 +54,19 @@ function minDueDateForVault(vaultId, payments) {
 
 export default function DashboardPage() {
   const { user } = useUser();
-  const { vaults } = useVaults();
-  const { payments } = usePayments();
-  const { unreadCount } = useNotifications();
+  const { vaults, refetch: refetchVaults, loading: vaultsLoading } = useVaults();
+  const { payments, refetch: refetchPayments } = usePayments();
+  const { unreadCount, refetch: refetchNotifications } = useNotifications();
   const mounted = useMounted();
 
   const handleRefresh = useCallback(async () => {
-    // Simulated network round-trip; in a real app this would re-fetch.
-    await new Promise((r) => setTimeout(r, 1000));
-    // Touch the store so subscribed hooks re-render with the latest data.
-    updateState((prev) => ({ ...prev }));
+    await Promise.all([
+      refetchVaults(),
+      refetchPayments(),
+      refetchNotifications(),
+    ]);
     toast("Up to date", { duration: 1500 });
-  }, []);
+  }, [refetchVaults, refetchPayments, refetchNotifications]);
 
   const { pull, refreshing, threshold } = usePullToRefresh({
     onRefresh: handleRefresh,

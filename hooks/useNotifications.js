@@ -1,110 +1,134 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getState, subscribe, updateState } from "@/lib/store";
-import { getSeedState } from "@/lib/mockData";
-import { getInitials } from "@/lib/utils";
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { mapNotificationRow } from "@/lib/supabase/mappers";
 
 export function useNotifications() {
-  const [notifications, setNotifications] = useState(
-    () => getSeedState().notifications,
-  );
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchNotifications = useCallback(async () => {
+    const supabase = createClient();
+    setLoading(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data, error: fetchErr } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("profile_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (fetchErr) {
+      setError(fetchErr.message);
+      setNotifications([]);
+    } else {
+      setNotifications((data ?? []).map(mapNotificationRow));
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    setNotifications(getState().notifications);
-    return subscribe(() => setNotifications(getState().notifications));
-  }, []);
+    fetchNotifications();
+    const supabase = createClient();
 
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.read).length,
-    [notifications],
-  );
+    const setupChannel = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
-  const markRead = useCallback((id) => {
-    updateState((prev) => ({
-      ...prev,
-      notifications: prev.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n,
-      ),
-    }));
-  }, []);
+      const channel = supabase
+        .channel(`notifications:${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `profile_id=eq.${user.id}`,
+          },
+          (payload) => {
+            setNotifications((prev) => [
+              mapNotificationRow(payload.new),
+              ...prev,
+            ]);
+          },
+        )
+        .subscribe();
 
-  const markAllRead = useCallback(() => {
-    updateState((prev) => ({
-      ...prev,
-      notifications: prev.notifications.map((n) => ({ ...n, read: true })),
-    }));
-  }, []);
-
-  const removeNotification = useCallback((id) => {
-    updateState((prev) => ({
-      ...prev,
-      notifications: prev.notifications.filter((n) => n.id !== id),
-    }));
-  }, []);
-
-  /**
-   * Accept a vault invitation notification: create a small starter vault
-   * with the current user as the only confirmed member, then remove the
-   * notification.
-   * @param {string} notificationId
-   */
-  const acceptInvite = useCallback((notificationId) => {
-    updateState((prev) => {
-      const notif = prev.notifications.find((n) => n.id === notificationId);
-      if (!notif) return prev;
-
-      const user = prev.user;
-      const vaultId = `vault-invite-${Date.now()}`;
-      const inviteName =
-        notif.body?.match(/“([^”]+)”/)?.[1] ??
-        notif.body?.match(/"([^"]+)"/)?.[1] ??
-        "Invited Vault";
-
-      const creator = {
-        id: `${vaultId}-u1`,
-        userId: user.id,
-        name: user.name,
-        initials: getInitials(user.name),
-        avatarColor: user.avatarColor ?? "#1B5E20",
-        phone: user.phone,
-        payoutOrder: 1,
-        agreementAccepted: true,
+      return () => {
+        supabase.removeChannel(channel);
       };
+    };
 
-      const newVault = {
-        id: vaultId,
-        name: inviteName,
-        description: notif.body ?? "",
-        memberCount: 1,
-        contributionAmount: 250,
-        contributionPeriod: "month",
-        currentRound: 1,
-        totalRounds: 6,
-        status: "active",
-        startDate: new Date().toISOString().slice(0, 10),
-        payoutOrderMethod: "fixed",
-        createdBy: "Invitation",
-        organiserId: creator.id,
-        payoutRecipientMemberId: creator.id,
-        members: [creator],
-        contributionHistory: [],
-        paymentStatusesByRound: { 1: { [creator.id]: "pending" } },
-      };
-
-      return {
-        ...prev,
-        vaults: [...prev.vaults, newVault],
-        notifications: prev.notifications.filter(
-          (n) => n.id !== notificationId,
-        ),
-      };
+    let cleanup;
+    setupChannel().then((fn) => {
+      cleanup = fn;
     });
+    return () => cleanup?.();
+  }, [fetchNotifications]);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const markRead = useCallback(async (id) => {
+    const supabase = createClient();
+    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    );
   }, []);
+
+  const markAllRead = useCallback(async () => {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("profile_id", user.id)
+      .eq("is_read", false);
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const removeNotification = useCallback(async (id) => {
+    const supabase = createClient();
+    await supabase.from("notifications").delete().eq("id", id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  const acceptInvite = useCallback(async (notification) => {
+    const supabase = createClient();
+    const inviteId = notification.inviteId ?? notification.metadata?.inviteId;
+    if (!inviteId) {
+      await markRead(notification.id);
+      return;
+    }
+    await supabase
+      .from("vault_invites")
+      .update({ status: "accepted", responded_at: new Date().toISOString() })
+      .eq("id", inviteId);
+    await markRead(notification.id);
+  }, [markRead]);
 
   return {
     notifications,
+    loading,
+    error,
     unreadCount,
+    refetch: fetchNotifications,
     markRead,
     markAllRead,
     removeNotification,

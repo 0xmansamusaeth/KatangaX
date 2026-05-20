@@ -59,7 +59,7 @@ const SECTIONS = [
     items: [
       { id: "phase5-tests", label: "All Phase 5 tests still passing" },
       { id: "mobile-money", label: "Mobile money flow still works (not broken by Web3)" },
-      { id: "localstorage-coexist", label: "localStorage mock data coexists with on-chain data" },
+      { id: "supabase-data", label: "Vault and profile data loads from Supabase" },
       { id: "no-console-errors", label: "No console errors on any page" },
       { id: "real-devices", label: "Tested on real iPhone (Safari) and Android (Chrome)" },
       {

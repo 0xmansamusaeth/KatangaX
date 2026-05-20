@@ -33,6 +33,7 @@ import { useCreateVault } from "@/lib/web3/hooks/useCreateVault";
 import { useUSDCBalance } from "@/lib/web3/hooks/useUSDCBalance";
 import { useWalletConnection } from "@/lib/web3/hooks/useWalletConnection";
 import { buildUsdcMemberWalletList } from "@/lib/web3/walletMembers";
+import { wizardFrequencyToDb } from "@/lib/supabase/mappers";
 import {
   frequencyToRoundDays,
   parseUsdc,
@@ -268,72 +269,55 @@ export function VaultCreateWizard() {
 
   const handleBack = () => setStep((s) => Math.max(0, s - 1));
 
-  const finishLocalVault = (id, contractAddress, memberWallets) => {
+  const finishLocalVault = async (contractAddress, memberWallets) => {
     const amount = Number(form.amount);
     const memberCount = form.memberCount;
 
     const creator = {
-      id: `${id}-u1`,
       userId: user.id,
       name: user.name,
       initials: getInitials(user.name),
       avatarColor: user.avatarColor ?? "#1B5E20",
-      phone: user.phone,
       payoutOrder: 1,
-      agreementAccepted: true,
-      walletAddress: memberWallets?.[0],
+      walletAddress: memberWallets?.[0] ?? user.walletAddress,
     };
 
     const invitedMembers = addedMembers.map((m, idx) => ({
-      id: m.id,
+      userId: m.userId ?? m.id,
       name: m.name ?? m.label ?? truncateAddress(m.walletAddress ?? ""),
-      initials: m.initials ?? truncateAddress(m.walletAddress ?? "0x").slice(2, 4).toUpperCase(),
+      initials:
+        m.initials ??
+        truncateAddress(m.walletAddress ?? "0x").slice(2, 4).toUpperCase(),
       avatarColor: m.avatarColor ?? "#6B7280",
-      phone: m.phone,
       payoutOrder: idx + 2,
-      agreementAccepted: false,
       walletAddress: memberWallets?.[idx + 1] ?? m.walletAddress,
     }));
 
     const members = [creator, ...invitedMembers];
-    while (members.length < memberCount) {
-      const order = members.length + 1;
-      members.push({
-        id: `${id}-pad-${order}`,
-        name: `Member ${order}`,
-        initials: "M",
-        avatarColor: "#6B7280",
-        payoutOrder: order,
-        agreementAccepted: false,
-        walletAddress: memberWallets?.[order - 1],
-      });
-    }
 
-    const paymentStatusesByRound = {
-      1: Object.fromEntries(members.map((m) => [m.id, "pending"])),
-    };
+    const resolvedContract =
+      contractAddress ??
+      `local:${typeof crypto !== "undefined" ? crypto.randomUUID() : Date.now()}`;
 
-    addVault({
-      id,
+    const { data, error } = await addVault({
+      contractAddress: resolvedContract,
       name: form.name.trim(),
       description: form.description.trim(),
       memberCount,
       contributionAmount: amount,
-      contributionPeriod: form.frequency,
+      frequency: wizardFrequencyToDb(form.frequency),
       paymentMethod: form.paymentMethod,
-      contractAddress: contractAddress || undefined,
       currentRound: 1,
       totalRounds: memberCount,
       status: "active",
-      startDate: form.startDate,
       payoutOrderMethod: form.payoutMethod,
-      createdBy: user.name,
-      organiserId: creator.id,
-      payoutRecipientMemberId: creator.id,
       members,
-      contributionHistory: [],
-      paymentStatusesByRound,
     });
+
+    if (error) {
+      toast(error, { variant: "error" });
+      return;
+    }
 
     if (contractAddress) {
       toast(`Vault deployed! Contract: ${truncateAddress(contractAddress)}`, {
@@ -342,7 +326,11 @@ export function VaultCreateWizard() {
     } else {
       toast("Vault created! Invites sent to members.");
     }
-    router.push(`/vaults/${id}`);
+
+    const vaultId = data?.id ?? contractAddress;
+    router.push(
+      contractAddress ? `/vaults/${contractAddress}` : `/vaults/${vaultId}`,
+    );
   };
 
   const submit = async () => {
@@ -350,8 +338,6 @@ export function VaultCreateWizard() {
       toast("Please accept the Vault Terms to continue", { variant: "error" });
       return;
     }
-
-    const id = `vault-${Date.now()}`;
 
     if (form.paymentMethod === "usdc") {
       if (!isConnected || !isBase || !address) {
@@ -376,7 +362,7 @@ export function VaultCreateWizard() {
       );
 
       setDeploying(true);
-      setPendingDeploy({ id, memberWallets });
+      setPendingDeploy({ memberWallets });
       try {
         await deployVault({
           vaultName: form.name.trim(),
@@ -392,7 +378,7 @@ export function VaultCreateWizard() {
       return;
     }
 
-    finishLocalVault(id, undefined, undefined);
+    await finishLocalVault(undefined, undefined);
   };
 
   useEffect(() => {
@@ -400,11 +386,7 @@ export function VaultCreateWizard() {
     const contractAddress = resolveVaultFromReceipt();
     if (!contractAddress) return;
     setDeployedAddress(contractAddress);
-    finishLocalVault(
-      pendingDeploy.id,
-      contractAddress,
-      pendingDeploy.memberWallets,
-    );
+    finishLocalVault(contractAddress, pendingDeploy.memberWallets);
     setPendingDeploy(null);
     setDeploying(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- finishLocalVault closes over form state

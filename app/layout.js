@@ -2,7 +2,6 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import { AnimatedRoute } from "@/components/layout/AnimatedRoute";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { StoreInit } from "@/components/layout/StoreInit";
 import { Toaster } from "@/components/ui/toast";
 import { Web3Providers } from "@/components/web3/Web3Providers";
 import { WrongNetworkBanner } from "@/components/web3/WrongNetworkBanner";
@@ -52,7 +51,6 @@ export default function RootLayout({ children }) {
             <AnimatedRoute>{children}</AnimatedRoute>
             <BottomNav />
           </div>
-          <StoreInit />
           <Toaster />
         </Web3Providers>
       </body>
