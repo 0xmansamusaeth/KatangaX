@@ -1,29 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PartyPopper } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StickyTabs } from "@/components/ui/sticky-tabs";
-import { toast } from "@/components/ui/toast";
-import { PaymentConfirmSheet } from "@/components/payments/PaymentConfirmSheet";
 import { PaymentDueCard } from "@/components/payments/PaymentDueCard";
 import { PaymentHistoryRow } from "@/components/payments/PaymentHistoryRow";
 import { useMounted } from "@/hooks/useMounted";
 import { usePayments } from "@/hooks/usePayments";
-import { useUser } from "@/hooks/useUser";
-import { useVaults } from "@/hooks/useVaults";
-import {
-  getDuePaymentsForUser,
-  getHistoryForUser,
-} from "@/lib/userActivity";
-import { OnChainPaymentsTab } from "@/components/payments/OnChainPaymentsTab";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const TABS = [
   { value: "due", label: "Due" },
   { value: "history", label: "History" },
-  { value: "onchain", label: "On-Chain" },
 ];
 
 const HISTORY_FILTERS = [
@@ -33,28 +23,12 @@ const HISTORY_FILTERS = [
 ];
 
 export default function PaymentsPage() {
+  const router = useRouter();
   const [tab, setTab] = useState("due");
   const [filter, setFilter] = useState("all");
-  const [activePayment, setActivePayment] = useState(null);
 
-  const { vaults } = useVaults();
-  const { payments } = usePayments();
-  const { user } = useUser();
-  const { markContribution } = useVaults();
-  // `getDuePaymentsForUser` calls `new Date()` to determine overdue
-  // ordering and per-row colors. Defer until the client mounts so
-  // hydration matches.
+  const { due, history, totals, loading } = usePayments();
   const mounted = useMounted();
-
-  const due = useMemo(
-    () => (mounted ? getDuePaymentsForUser(vaults, payments, user) : []),
-    [mounted, vaults, payments, user],
-  );
-
-  const history = useMemo(
-    () => getHistoryForUser(vaults, user),
-    [vaults, user],
-  );
 
   const filteredHistory = useMemo(() => {
     if (filter === "all") return history;
@@ -63,42 +37,8 @@ export default function PaymentsPage() {
     return history.filter((h) => h.kind === "payout");
   }, [history, filter]);
 
-  const totals = useMemo(() => {
-    return history.reduce(
-      (acc, h) => {
-        if (h.kind === "payout") acc.received += h.amount;
-        else if (h.status !== "pending") acc.contributed += h.amount;
-        return acc;
-      },
-      { contributed: 0, received: 0 },
-    );
-  }, [history]);
-
   const onPay = (dueItem) => {
-    const vault = vaults.find((v) => v.id === dueItem.vaultId);
-    if (!vault) return;
-    setActivePayment({
-      id: dueItem.id,
-      vaultId: dueItem.vaultId,
-      vaultName: dueItem.vaultName,
-      memberId: dueItem.memberId,
-      amount: dueItem.amount,
-      round: dueItem.round,
-      totalRounds: vault.totalRounds,
-      contributionPeriod: vault.contributionPeriod,
-    });
-  };
-
-  const confirmActivePayment = () => {
-    if (!activePayment) return;
-    markContribution(
-      activePayment.vaultId,
-      activePayment.memberId,
-      activePayment.round,
-      "paid",
-    );
-    setActivePayment(null);
-    toast("Payment confirmed. Receipt sent.");
+    router.push(`/vaults/${dueItem.vaultId}`);
   };
 
   return (
@@ -107,25 +47,17 @@ export default function PaymentsPage() {
 
       <div className="pt-4">
         {tab === "due" ? (
-          <DueTab items={due} onPay={onPay} ready={mounted} />
-        ) : tab === "history" ? (
+          <DueTab items={due} onPay={onPay} ready={mounted && !loading} />
+        ) : (
           <HistoryTab
             items={filteredHistory}
             filter={filter}
             onFilterChange={setFilter}
             totals={totals}
+            ready={mounted && !loading}
           />
-        ) : (
-          <OnChainPaymentsTab />
         )}
       </div>
-
-      <PaymentConfirmSheet
-        isOpen={!!activePayment}
-        onClose={() => setActivePayment(null)}
-        payment={activePayment}
-        onConfirm={confirmActivePayment}
-      />
     </PageWrapper>
   );
 }
@@ -148,7 +80,7 @@ function DueTab({ items, onPay, ready }) {
     return (
       <EmptyState
         emoji="🎉"
-        title="You’re all caught up!"
+        title="You're all caught up!"
         description="No outstanding contributions across your vaults. Nice work."
       />
     );
@@ -165,12 +97,20 @@ function DueTab({ items, onPay, ready }) {
   );
 }
 
-function HistoryTab({ items, filter, onFilterChange, totals }) {
+function HistoryTab({ items, filter, onFilterChange, totals, ready }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2">
-        <StatBox label="Total Contributed" value={formatCurrency(totals.contributed)} tone="muted" />
-        <StatBox label="Total Received" value={formatCurrency(totals.received)} tone="accent" />
+        <StatBox
+          label="Total Contributed"
+          value={`${Number(totals.contributed).toFixed(2)} USDC`}
+          tone="muted"
+        />
+        <StatBox
+          label="Total Received"
+          value={`${Number(totals.received).toFixed(2)} USDC`}
+          tone="accent"
+        />
       </div>
 
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide">
@@ -194,11 +134,20 @@ function HistoryTab({ items, filter, onFilterChange, totals }) {
         })}
       </div>
 
-      {items.length === 0 ? (
+      {!ready ? (
+        <ul className="space-y-2" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <li
+              key={i}
+              className="h-[68px] animate-pulse rounded-xl bg-[#F1F3F4]"
+            />
+          ))}
+        </ul>
+      ) : items.length === 0 ? (
         <EmptyState
           emoji="📭"
           title="No history yet"
-          description="Once contributions and payouts complete, they’ll appear here."
+          description="Once contributions and payouts complete, they'll appear here."
         />
       ) : (
         <ul className="space-y-2">

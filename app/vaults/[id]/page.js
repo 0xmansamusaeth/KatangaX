@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AlertTriangle, Calendar } from "lucide-react";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 import { CircularProgressRing } from "@/components/vaults/CircularProgressRing";
 import { HistoryTab } from "@/components/vaults/HistoryTab";
 import { OrganiserActions } from "@/components/vaults/OrganiserActions";
@@ -17,6 +18,7 @@ import { VaultWeb3Hero } from "@/components/vaults/VaultWeb3Hero";
 import { useMounted } from "@/hooks/useMounted";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
+import { useVaultRealtime } from "@/hooks/useVaultRealtime";
 import {
   formatCurrency,
   formatDate,
@@ -33,10 +35,44 @@ const TABS = [
 export default function VaultDetailPage() {
   const params = useParams();
   const id = params?.id;
-  const { vaults } = useVaults();
+  const { vaults, refetch: refetchVaults } = useVaults();
   const { user } = useUser();
   const [tab, setTab] = useState("overview");
   const mounted = useMounted();
+
+  const handleContribution = useCallback(
+    (row) => {
+      refetchVaults();
+      if (row?.profile_id !== user?.id) {
+        toast("New contribution received", { variant: "info" });
+      }
+    },
+    [refetchVaults, user?.id],
+  );
+
+  const handleSignature = useCallback(() => {
+    refetchVaults();
+    toast("A custodian just signed", { variant: "info" });
+  }, [refetchVaults]);
+
+  const handleDisbursement = useCallback(
+    (row) => {
+      refetchVaults();
+      if (row?.status === "disbursed") {
+        toast("🎉 Payout disbursed!", { variant: "success" });
+      }
+    },
+    [refetchVaults],
+  );
+
+  const supabaseVaultId =
+    typeof id === "string" && id.length === 36 ? id : null;
+
+  useVaultRealtime(supabaseVaultId, {
+    onContribution: handleContribution,
+    onSignature: handleSignature,
+    onDisbursement: handleDisbursement,
+  });
 
   const vault = useMemo(() => {
     const byId = vaults.find((v) => v.id === id);

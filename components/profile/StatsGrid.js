@@ -10,6 +10,11 @@ import { formatCurrency } from "@/lib/utils";
  *   currency?: string,
  * }} props
  */
+function formatAmount(amount, currency) {
+  if (currency === "USDC") return `${Number(amount ?? 0).toFixed(2)} USDC`;
+  return formatCurrency(amount, currency);
+}
+
 export function StatsGrid({
   vaultsJoined,
   totalSaved,
@@ -20,10 +25,10 @@ export function StatsGrid({
   return (
     <div className="grid grid-cols-2 gap-2">
       <StatCard label="Vaults Joined" value={`${vaultsJoined}`} />
-      <StatCard label="Total Saved" value={formatCurrency(totalSaved, currency)} accent />
+      <StatCard label="Total Saved" value={formatAmount(totalSaved, currency)} accent />
       <StatCard
         label="Total Received"
-        value={formatCurrency(totalReceived, currency)}
+        value={formatAmount(totalReceived, currency)}
       />
       <StatCard
         label="Reliability Score"

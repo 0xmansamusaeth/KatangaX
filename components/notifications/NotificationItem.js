@@ -1,37 +1,16 @@
 "use client";
 
-import {
-  AlertTriangle,
-  Clock,
-  Gift,
-  Landmark,
-  UserPlus,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import {
+  NOTIFICATION_TYPES,
+  getNotificationMeta,
+} from "@/lib/notificationTemplates";
 
-const TYPE_META = {
-  payment_reminder: {
-    Icon: Clock,
-    wrap: "bg-[#16A34A]/15 text-[#166534]",
-  },
-  payout_alert: {
-    Icon: Gift,
-    wrap: "bg-[#FFC107]/25 text-[#92400E]",
-  },
-  member_join: {
-    Icon: UserPlus,
-    wrap: "bg-[#1E40AF]/15 text-[#1E40AF]",
-  },
-  late_payment: {
-    Icon: AlertTriangle,
-    wrap: "bg-[#DC2626]/15 text-[#991B1B]",
-  },
-  invitation: {
-    Icon: Landmark,
-    wrap: "bg-[#F3F4F6] text-[#4B5563]",
-  },
-};
+const INVITE_TYPES = new Set([
+  NOTIFICATION_TYPES.VAULT_INVITE,
+  "invitation",
+]);
 
 /**
  * @param {{
@@ -47,10 +26,11 @@ export function NotificationItem({
   onAccept,
   onDecline,
 }) {
-  const meta = TYPE_META[notification.type] ?? TYPE_META.payment_reminder;
+  const meta = getNotificationMeta(notification.type);
   const Icon = meta.Icon;
-  const isInvite = notification.type === "invitation";
+  const isInvite = INVITE_TYPES.has(notification.type);
   const unread = !notification.read;
+  const bodyText = notification.body ?? notification.message ?? "";
 
   return (
     <div
@@ -88,7 +68,7 @@ export function NotificationItem({
             ) : null}
           </div>
           <p className="mt-0.5 text-xs leading-snug text-[#6B7280]">
-            {notification.body}
+            {bodyText}
           </p>
           <p
             className="mt-1 text-[11px] text-[#9CA3AF]"

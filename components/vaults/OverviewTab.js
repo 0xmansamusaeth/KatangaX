@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, Star, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { Web3ContributeSheet } from "@/components/web3/Web3ContributeSheet";
-import { Web3DisbursementPanel } from "@/components/web3/Web3DisbursementPanel";
+import { DisbursementSection } from "@/components/web3/DisbursementSection";
 import { ContributeNowSheet } from "@/components/vaults/ContributeNowSheet";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
@@ -59,8 +59,6 @@ export function OverviewTab({ vault }) {
   };
 
   const onWeb3Success = () => {
-    if (!userMember) return;
-    markContribution(vault.id, userMember.id, vault.currentRound, "paid");
     setSheetOpen(false);
     chain.refetch();
     toast("Contribution confirmed on Base ✅", { variant: "success" });
@@ -93,9 +91,7 @@ export function OverviewTab({ vault }) {
         </div>
       ) : null}
 
-      {isUsdcVault ? (
-        <Web3DisbursementPanel vault={vault} user={user} />
-      ) : null}
+      {isUsdcVault ? <DisbursementSection vault={vault} /> : null}
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-[#1A1A1A]">

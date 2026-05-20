@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { Copy } from "lucide-react";
+import { AlertTriangle, Copy, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { ConnectWalletButton } from "@/components/web3/ConnectWalletButton";
 import { MobileWalletLinks } from "@/components/web3/MobileWalletLinks";
 import { UsdcOnrampSheet } from "@/components/web3/UsdcOnrampSheet";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/web3/utils";
 import { formatDate } from "@/lib/utils";
 import { useDisconnect } from "wagmi";
+import { useProfile } from "@/hooks/useProfile";
 
 function BaseBadge() {
   return (
@@ -41,14 +43,63 @@ export function Web3WalletSection() {
   const { disconnect } = useDisconnect();
   const activity = useWalletOnChainActivity();
   const { openConnectModal } = useConnectModal();
+  const { profile, updateProfile } = useProfile();
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [onrampOpen, setOnrampOpen] = useState(false);
+  const [changeOpen, setChangeOpen] = useState(false);
+  const [pendingChange, setPendingChange] = useState(false);
+  const previousAddress = useRef(null);
 
   useEffect(() => {
     if (!isConnected && !hasSeenWeb3Onboarding()) {
       setOnboardingOpen(true);
     }
   }, [isConnected]);
+
+  // If the user kicks off "Change Wallet", we wait for the next connected
+  // address (which differs from the profile's stored one) and save it.
+  useEffect(() => {
+    if (!pendingChange) return;
+    if (!isConnected || !address) return;
+    if (!profile) return;
+    if (
+      profile.walletAddress &&
+      profile.walletAddress.toLowerCase() === address.toLowerCase()
+    ) {
+      setPendingChange(false);
+      return;
+    }
+    (async () => {
+      const res = await updateProfile({ walletAddress: address });
+      setPendingChange(false);
+      if (res?.error) {
+        toast(`Couldn't update profile: ${res.error}`, { variant: "error" });
+      } else {
+        toast("Profile wallet updated", { variant: "success" });
+      }
+    })();
+  }, [pendingChange, isConnected, address, profile, updateProfile]);
+
+  useEffect(() => {
+    previousAddress.current = address;
+  }, [address]);
+
+  const walletMismatch =
+    isConnected &&
+    address &&
+    profile?.walletAddress &&
+    profile.walletAddress.toLowerCase() !== address.toLowerCase();
+
+  const startChangeWallet = () => {
+    setChangeOpen(false);
+    setPendingChange(true);
+    try {
+      disconnect();
+    } catch {
+      /* ignore */
+    }
+    setTimeout(() => openConnectModal?.(), 300);
+  };
 
   const copyAddress = async () => {
     if (!address) return;
@@ -157,14 +208,53 @@ export function Web3WalletSection() {
           View on Basescan →
         </Link>
 
-        <button
-          type="button"
-          onClick={() => disconnect()}
-          className="mt-4 block text-sm font-medium text-[#DC2626]"
-        >
-          Disconnect
-        </button>
+        {walletMismatch ? (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-[#DC2626]/30 bg-[#DC2626]/5 p-3 text-xs">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#DC2626]" />
+            <div className="flex-1">
+              <p className="font-medium text-[#991B1B]">
+                Connected wallet doesn&apos;t match your profile
+              </p>
+              <p className="mt-0.5 text-[#6B7280]">
+                Profile: {truncateAddress(profile?.walletAddress)} · Connected:{" "}
+                {truncateAddress(address)}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => setChangeOpen(true)}
+              >
+                Update profile wallet
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setChangeOpen(true)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1B5E20]"
+          >
+            <RefreshCcw className="h-3.5 w-3.5" /> Change wallet
+          </button>
+          <button
+            type="button"
+            onClick={() => disconnect()}
+            className="text-sm font-medium text-[#DC2626]"
+          >
+            Disconnect
+          </button>
+        </div>
       </div>
+
+      <ChangeWalletSheet
+        open={changeOpen}
+        onClose={() => setChangeOpen(false)}
+        onConfirm={startChangeWallet}
+      />
 
       <UsdcOnrampSheet
         open={onrampOpen}
@@ -257,5 +347,43 @@ function Stat({ label, value }) {
       <p className="text-[10px] uppercase text-[#6B7280]">{label}</p>
       <p className="font-bold text-[#1A1A1A]">{value}</p>
     </div>
+  );
+}
+
+function ChangeWalletSheet({ open, onClose, onConfirm }) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Change profile wallet">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 rounded-xl border border-[#FFC107]/40 bg-[#FFFBEB] p-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#92400E]" />
+          <div className="text-sm text-[#4B5563]">
+            <p className="font-semibold text-[#92400E]">
+              This affects vaults where you are a custodian
+            </p>
+            <p className="mt-1">
+              Other custodians will need to re-verify your new wallet before
+              you can sign for disbursements. Make sure you have backed up
+              your new wallet&apos;s recovery phrase and that other vault
+              members know you&apos;re switching.
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-[#6B7280]">
+          We&apos;ll disconnect your current wallet, prompt you to connect a
+          new one, and update your KatangaX profile with the new address.
+        </p>
+        <Button type="button" className="w-full" size="lg" onClick={onConfirm}>
+          Continue — disconnect & reconnect
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={onClose}
+        >
+          Cancel
+        </Button>
+      </div>
+    </BottomSheet>
   );
 }

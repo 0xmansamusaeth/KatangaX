@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -15,13 +15,14 @@ import { TrustScoreCard } from "@/components/profile/TrustScoreCard";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
-import { getProfileAggregates } from "@/lib/userActivity";
+import { useProfileStats } from "@/hooks/useProfileStats";
 import { getTrustScore } from "@/lib/utils";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user } = useUser();
   const { vaults } = useVaults();
+  const stats = useProfileStats();
 
   const myVaults = useMemo(
     () =>
@@ -29,11 +30,6 @@ export default function ProfilePage() {
         (v.members ?? []).some((m) => m.userId === user.id),
       ),
     [vaults, user.id],
-  );
-
-  const aggregates = useMemo(
-    () => getProfileAggregates(vaults, user),
-    [vaults, user],
   );
 
   const trustScore = getTrustScore(user.id);
@@ -55,20 +51,31 @@ export default function ProfilePage() {
         <ProfileHero user={user} />
 
         <StatsGrid
-          vaultsJoined={aggregates.vaultsJoined}
-          totalSaved={aggregates.totalContributed}
-          totalReceived={aggregates.totalReceived}
-          reliability={aggregates.reliability}
-          currency={user.currency}
+          vaultsJoined={stats.vaultsJoined}
+          totalSaved={stats.totalContributed}
+          totalReceived={stats.totalReceived}
+          reliability={stats.reliability}
+          currency="USDC"
         />
+
+        {stats.custodianOf > 0 ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-[#FFC107]/40 bg-[#FFFBEB] p-3 text-sm">
+            <ShieldCheck className="h-5 w-5 text-[#92400E]" />
+            <span className="text-[#92400E]">
+              Custodian on{" "}
+              <span className="font-semibold">{stats.custodianOf}</span> vault
+              {stats.custodianOf === 1 ? "" : "s"}
+            </span>
+          </div>
+        ) : null}
 
         <TrustScoreCard
           score={trustScore}
           stats={{
-            onTime: aggregates.onTime,
-            missed: aggregates.missed,
-            vaultsCompleted: aggregates.vaultsCompleted,
-            membersReferred: 4,
+            onTime: stats.onTime,
+            missed: stats.missed,
+            vaultsCompleted: stats.vaultsCompleted,
+            membersReferred: 0,
           }}
         />
 

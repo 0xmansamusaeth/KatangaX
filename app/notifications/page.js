@@ -57,7 +57,7 @@ export default function NotificationsPage() {
   };
 
   const onAccept = (n) => {
-    acceptInvite(n.id);
+    acceptInvite(n);
     toast("Invitation accepted. Vault added to your list.");
   };
 
