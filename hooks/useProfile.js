@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { mapProfileRow, profileToUser } from "@/lib/supabase/mappers";
+import { checksumAddress } from "@/lib/web3/utils";
 
 export function useProfile() {
   const [profile, setProfile] = useState(null);
@@ -62,7 +63,13 @@ export function useProfile() {
       if (patch.phoneNumber != null) dbPatch.phone_number = patch.phoneNumber;
       if (patch.username != null) dbPatch.username = patch.username;
       if (patch.avatarColor != null) dbPatch.avatar_color = patch.avatarColor;
-      if (patch.walletAddress != null) dbPatch.wallet_address = patch.walletAddress;
+      if (patch.walletAddress != null) {
+        const normalized = checksumAddress(patch.walletAddress);
+        if (!normalized && patch.walletAddress !== "") {
+          return { error: "Invalid wallet address" };
+        }
+        dbPatch.wallet_address = normalized;
+      }
       if (patch.isCustodianEligible != null) {
         dbPatch.is_custodian_eligible = patch.isCustodianEligible;
       }

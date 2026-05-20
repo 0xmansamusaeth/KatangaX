@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { mapVaultRow, mapVaultMember } from "@/lib/supabase/mappers";
+import { checksumAddress } from "@/lib/web3/utils";
 
 export function useVaults() {
   const [vaults, setVaults] = useState([]);
@@ -61,10 +62,14 @@ export function useVaults() {
       } = await supabase.auth.getUser();
       if (!user) return { error: "Not signed in" };
 
+      const normalizedContract =
+        checksumAddress(vaultPayload.contractAddress) ??
+        vaultPayload.contractAddress;
+
       const { data: vault, error: insertErr } = await supabase
         .from("vaults")
         .insert({
-          contract_address: vaultPayload.contractAddress,
+          contract_address: normalizedContract,
           name: vaultPayload.name,
           organiser_id: user.id,
           contribution_amount: vaultPayload.contributionAmount,
@@ -84,14 +89,18 @@ export function useVaults() {
 
       const members = vaultPayload.members ?? [];
       if (members.length) {
-        const memberRows = members.map((m, idx) => ({
-          vault_id: vault.id,
-          profile_id:
-            m.userId && String(m.userId).length === 36 ? m.userId : null,
-          wallet_address: m.walletAddress ?? m.wallet_address ?? "",
-          payout_order: m.payoutOrder ?? idx + 1,
-          is_custodian: Boolean(m.isCustodian),
-        }));
+        const memberRows = members.map((m, idx) => {
+          const rawWallet = m.walletAddress ?? m.wallet_address ?? "";
+          const wallet = checksumAddress(rawWallet) ?? rawWallet;
+          return {
+            vault_id: vault.id,
+            profile_id:
+              m.userId && String(m.userId).length === 36 ? m.userId : null,
+            wallet_address: wallet,
+            payout_order: m.payoutOrder ?? idx + 1,
+            is_custodian: Boolean(m.isCustodian),
+          };
+        });
         const { error: membersErr } = await supabase
           .from("vault_members")
           .insert(memberRows);

@@ -138,14 +138,18 @@ BEGIN
 END;
 $$;
 
--- Helper: lookup vault row by on-chain contract address
+-- Helper: lookup vault row by on-chain contract address.
+-- Case-insensitive so callers can pass any casing (lower, upper, checksum).
 CREATE OR REPLACE FUNCTION get_vault_by_contract(p_contract_address text)
 RETURNS uuid
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT id FROM vaults WHERE contract_address = p_contract_address LIMIT 1;
+  SELECT id
+    FROM vaults
+   WHERE lower(contract_address) = lower(p_contract_address)
+   LIMIT 1;
 $$;
 
 GRANT EXECUTE ON FUNCTION notify_vault_members(uuid, text, text, text, uuid) TO authenticated;
@@ -164,3 +168,16 @@ CREATE INDEX IF NOT EXISTS idx_disbursement_sigs_disbursement
   ON disbursement_signatures(disbursement_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_profile_created
   ON notifications(profile_id, created_at DESC);
+
+-- Case-insensitive uniqueness + lookup indexes for on-chain addresses.
+-- Postgres `text UNIQUE` is binary, so two casings of the same address would
+-- otherwise both be allowed. These functional indexes keep one row per
+-- address regardless of casing, and back the lower()=lower() comparisons
+-- used by get_vault_by_contract / wallet lookups.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_vaults_contract_address_lower
+  ON vaults(lower(contract_address));
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_profiles_wallet_address_lower
+  ON profiles(lower(wallet_address))
+  WHERE wallet_address IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_vault_members_wallet_lower
+  ON vault_members(lower(wallet_address));

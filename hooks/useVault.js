@@ -25,10 +25,12 @@ export function useVault(vaultId) {
 
     let resolvedId = vaultId;
     if (vaultId.startsWith("0x")) {
+      // Case-insensitive lookup: addresses may arrive lowercased from the
+      // URL but rows are stored checksum-cased.
       const { data: byContract } = await supabase
         .from("vaults")
         .select("id")
-        .eq("contract_address", vaultId)
+        .ilike("contract_address", vaultId)
         .maybeSingle();
       if (!byContract) {
         setVault(null);
