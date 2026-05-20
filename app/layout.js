@@ -1,6 +1,7 @@
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { AnimatedRoute } from "@/components/layout/AnimatedRoute";
+import { AppShell } from "@/components/layout/AppShell";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Toaster } from "@/components/ui/toast";
 import { Web3Providers } from "@/components/web3/Web3Providers";
@@ -46,12 +47,14 @@ export default function RootLayout({ children }) {
     <html lang="en" className={poppins.variable}>
       <body className="min-h-screen bg-[#F5F7F5] font-sans antialiased">
         <Web3Providers>
-          <WrongNetworkBanner />
-          <div className="relative mx-auto min-h-screen w-full max-w-[430px] bg-[#F5F7F5] shadow-[0_0_40px_rgba(0,0,0,0.06)]">
-            <AnimatedRoute>{children}</AnimatedRoute>
-            <BottomNav />
-          </div>
-          <Toaster />
+          <AppShell>
+            <WrongNetworkBanner />
+            <div className="relative mx-auto min-h-screen w-full max-w-[430px] bg-[#F5F7F5] shadow-[0_0_40px_rgba(0,0,0,0.06)]">
+              <AnimatedRoute>{children}</AnimatedRoute>
+              <BottomNav />
+            </div>
+            <Toaster />
+          </AppShell>
         </Web3Providers>
       </body>
     </html>

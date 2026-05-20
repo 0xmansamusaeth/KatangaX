@@ -31,6 +31,14 @@ import {
 } from "@/lib/web3/utils";
 import { recordContribution, checkAndProgressRound } from "@/lib/web3/roundMonitor";
 import { useProfile } from "@/hooks/useProfile";
+import { useIsOnline } from "@/components/OfflineBanner";
+import {
+  addPendingTx,
+  makePendingKey,
+  removePendingTx,
+} from "@/lib/web3/pendingTx";
+import { canContribute } from "@/lib/vaultGuards";
+import { createClient } from "@/lib/supabase/client";
 
 /**
  * @param {{
@@ -46,8 +54,10 @@ export function Web3ContributeSheet({ open, onClose, vault, onSuccess }) {
   const { balance: usdcBalance } = useUSDCBalance();
   const { allowance } = useUSDCAllowance(vault.contractAddress);
   const chain = useOnChainVaultData(vault.contractAddress);
+  const isOnline = useIsOnline();
   const [onrampOpen, setOnrampOpen] = useState(false);
   const [recorded, setRecorded] = useState(false);
+  const [alreadyContributed, setAlreadyContributed] = useState(false);
 
   const amount = useMemo(
     () => parseUsdc(String(vault.contributionAmount ?? 0)),
@@ -78,6 +88,23 @@ export function Web3ContributeSheet({ open, onClose, vault, onSuccess }) {
   );
 
   const paidOnChain = Boolean(chain.member?.paidThisRound);
+
+  // Belt-and-braces: also check Supabase contributions for this round so a
+  // user can't double-spend if on-chain status hasn't refreshed yet.
+  useEffect(() => {
+    if (!open || !profile?.id) return;
+    if (!vault?.id || String(vault.id).length !== 36) return;
+    const supabase = createClient();
+    (async () => {
+      const { count } = await supabase
+        .from("contributions")
+        .select("id", { count: "exact", head: true })
+        .eq("vault_id", vault.id)
+        .eq("profile_id", profile.id)
+        .eq("round_number", vault.currentRound);
+      setAlreadyContributed((count ?? 0) > 0);
+    })();
+  }, [open, profile?.id, vault?.id, vault?.currentRound]);
   const insufficientUsdc = usdcBalance != null && usdcBalance < amount;
   const needsApproval = (allowance ?? 0n) < amount;
   const custodianCount = (vault.members ?? []).filter((m) => m.isCustodian).length;
@@ -115,10 +142,16 @@ export function Web3ContributeSheet({ open, onClose, vault, onSuccess }) {
         body: "Only invited members can contribute to this vault.",
       };
     }
-    if (paidOnChain) {
+    if (paidOnChain || alreadyContributed) {
       return {
         title: "Already paid this round",
         body: `You've already contributed for round ${vault.currentRound}.`,
+      };
+    }
+    if (!isOnline) {
+      return {
+        title: "You're offline",
+        body: "Transactions require an internet connection. Reconnect and try again.",
       };
     }
     if (!custodiansAssigned) {
@@ -142,6 +175,8 @@ export function Web3ContributeSheet({ open, onClose, vault, onSuccess }) {
     isBase,
     isMember,
     paidOnChain,
+    alreadyContributed,
+    isOnline,
     custodiansAssigned,
     insufficientUsdc,
     amount,
@@ -181,6 +216,21 @@ export function Web3ContributeSheet({ open, onClose, vault, onSuccess }) {
 
     (async () => {
       setRecorded(true);
+      removePendingTx(
+        makePendingKey({
+          vaultId: vault.id,
+          action: "contribute",
+          roundNumber: vault.currentRound,
+        }),
+      );
+      removePendingTx(
+        makePendingKey({
+          vaultId: vault.id,
+          action: "approve",
+          roundNumber: vault.currentRound,
+        }),
+      );
+
       const recordRes = await recordContribution({
         contractAddress: vault.contractAddress,
         vaultId: vault.id?.length === 36 ? vault.id : undefined,
@@ -225,9 +275,39 @@ export function Web3ContributeSheet({ open, onClose, vault, onSuccess }) {
   const handlePrimary = async () => {
     try {
       if (uiStep === "approve") {
-        await approve();
+        const hash = await approve();
+        if (hash) {
+          addPendingTx({
+            key: makePendingKey({
+              vaultId: vault.id,
+              action: "approve",
+              roundNumber: vault.currentRound,
+            }),
+            action: "approve",
+            vaultId: vault.id,
+            contractAddress: vault.contractAddress,
+            roundNumber: vault.currentRound,
+            profileId: profile?.id,
+            txHash: hash,
+          });
+        }
       } else {
-        await contribute();
+        const hash = await contribute();
+        if (hash) {
+          addPendingTx({
+            key: makePendingKey({
+              vaultId: vault.id,
+              action: "contribute",
+              roundNumber: vault.currentRound,
+            }),
+            action: "contribute",
+            vaultId: vault.id,
+            contractAddress: vault.contractAddress,
+            roundNumber: vault.currentRound,
+            profileId: profile?.id,
+            txHash: hash,
+          });
+        }
       }
     } catch {
       /* errors surfaced via toast inside hook */

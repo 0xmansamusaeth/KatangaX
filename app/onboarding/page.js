@@ -8,8 +8,11 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { toE164 } from "@/lib/supabase/phone";
 import { toast } from "@/components/ui/toast";
-
-const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+import {
+  isValidUsername,
+  normaliseUsername,
+  sanitizeText,
+} from "@/lib/validation";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -34,8 +37,8 @@ export default function OnboardingPage() {
   }, [resendIn]);
 
   const checkUsername = useCallback(async (value) => {
-    const u = value.trim().toLowerCase();
-    if (!USERNAME_RE.test(u)) {
+    const u = normaliseUsername(value);
+    if (!isValidUsername(u)) {
       setUsernameStatus("invalid");
       return;
     }
@@ -89,11 +92,23 @@ export default function OnboardingPage() {
     if (!user) return;
 
     if (isSignUp) {
+      const cleanName = sanitizeText(fullName);
+      const cleanUsername = normaliseUsername(username);
+      if (!cleanName || cleanName.length < 2) {
+        toast("Please enter your full name", { variant: "error" });
+        return;
+      }
+      if (!isValidUsername(cleanUsername)) {
+        toast("Username can only contain lowercase letters, numbers and _", {
+          variant: "error",
+        });
+        return;
+      }
       const { error: profileErr } = await supabase.from("profiles").insert({
         id: user.id,
-        full_name: fullName.trim(),
+        full_name: cleanName,
         phone_number: pendingPhone,
-        username: username.trim().toLowerCase(),
+        username: cleanUsername,
         avatar_color: "#1B5E20",
       });
 
@@ -174,7 +189,9 @@ export default function OnboardingPage() {
               id="name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              onBlur={(e) => setFullName(sanitizeText(e.target.value))}
               placeholder="Your name"
+              maxLength={80}
             />
           </div>
           <div>
@@ -198,12 +215,11 @@ export default function OnboardingPage() {
             <Input
               id="username"
               value={username}
-              onChange={(e) =>
-                setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))
-              }
+              onChange={(e) => setUsername(normaliseUsername(e.target.value))}
               onBlur={() => checkUsername(username)}
               placeholder="yourname"
               className="lowercase"
+              maxLength={20}
             />
             {usernameStatus === "available" ? (
               <p className="mt-1 text-xs text-[#16A34A]">✓ Username available</p>

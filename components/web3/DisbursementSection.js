@@ -25,6 +25,13 @@ import {
 } from "@/lib/web3/utils";
 import { resolveMemberDisplay } from "@/lib/utils";
 import { markDisbursed, recordSignature } from "@/lib/web3/roundMonitor";
+import { useIsOnline } from "@/components/OfflineBanner";
+import {
+  addPendingTx,
+  makePendingKey,
+  removePendingTx,
+} from "@/lib/web3/pendingTx";
+import { canSignDisbursement } from "@/lib/vaultGuards";
 
 const MIN_APPROVALS = 3;
 const DUMMY_SIG =
@@ -37,6 +44,7 @@ export function DisbursementSection({ vault }) {
   const { profile } = useProfile();
   const { address, isBase, isConnected } = useWalletConnection();
   const chain = useOnChainVaultData(vault.contractAddress);
+  const isOnline = useIsOnline();
 
   const round = chain.currentRound ?? vault.currentRound ?? 1;
   const hash = chain.round?.disbursementHash;
@@ -115,7 +123,22 @@ export function DisbursementSection({ vault }) {
   const youAreCustodian = Boolean(
     profile?.id && custodians.some((m) => m.userId === profile.id),
   );
-  const youHaveSigned = Boolean(chain.member?.approvedCurrentRound);
+  const youHaveSignedOnChain = Boolean(chain.member?.approvedCurrentRound);
+  const youHaveSignedDb = Boolean(
+    profile?.id && signatures.some((s) => s.custodian_id === profile.id),
+  );
+  const youHaveSigned = youHaveSignedOnChain || youHaveSignedDb;
+
+  const signGuard = canSignDisbursement(
+    vault,
+    disbursement,
+    profile,
+    address,
+    {
+      alreadySigned: youHaveSigned,
+      roundFullyFunded: allMembersPaid || onChainSigCount > 0,
+    },
+  );
 
   // Map signed wallets for the per-custodian list display.
   const signedWallets = useMemo(() => {
@@ -130,6 +153,15 @@ export function DisbursementSection({ vault }) {
     if (!isSuccess || recorded) return;
     if (!txHash) return;
     setRecorded(true);
+
+    removePendingTx(
+      makePendingKey({
+        vaultId: supabaseVaultId ?? vault.id,
+        action: "sign_disbursement",
+        disbursementId: disbursement?.id,
+        roundNumber: round,
+      }),
+    );
 
     (async () => {
       await chain.refetch();
@@ -177,6 +209,7 @@ export function DisbursementSection({ vault }) {
     refetchRound,
     disbursement?.id,
     profile?.id,
+    vault.id,
     profile?.fullName,
     address,
     supabaseVaultId,
@@ -188,9 +221,42 @@ export function DisbursementSection({ vault }) {
     vault.totalRounds,
   ]);
 
+  const doApprove = async () => {
+    if (!isOnline) {
+      toast("You're offline. Reconnect to sign.", { variant: "error" });
+      return;
+    }
+    if (!signGuard.allowed) {
+      toast(signGuard.reason, { variant: "error" });
+      return;
+    }
+    try {
+      const hash = await approve();
+      if (hash) {
+        addPendingTx({
+          key: makePendingKey({
+            vaultId: supabaseVaultId ?? vault.id,
+            action: "sign_disbursement",
+            disbursementId: disbursement?.id,
+            roundNumber: round,
+          }),
+          action: "sign_disbursement",
+          vaultId: supabaseVaultId ?? vault.id,
+          contractAddress: vault.contractAddress,
+          roundNumber: round,
+          disbursementId: disbursement?.id,
+          profileId: profile?.id,
+          txHash: hash,
+        });
+      }
+    } catch {
+      /* surfaced via hook */
+    }
+  };
+
   const requestSign = () => {
     if (hasDismissedSignatureExplainer()) {
-      approve();
+      doApprove();
       return;
     }
     setExplainerOpen(true);
@@ -220,7 +286,14 @@ export function DisbursementSection({ vault }) {
           potAmount={potAmount}
           gas={gas}
           status={status}
-          web3Disabled={web3Disabled}
+          web3Disabled={web3Disabled || !signGuard.allowed || !isOnline}
+          blockReason={
+            !isOnline
+              ? "You're offline"
+              : !signGuard.allowed
+                ? signGuard.reason
+                : null
+          }
           onSign={requestSign}
         />
       ) : null}
@@ -258,7 +331,7 @@ export function DisbursementSection({ vault }) {
       <SignatureExplainerSheet
         open={explainerOpen}
         onClose={() => setExplainerOpen(false)}
-        onContinue={() => approve()}
+        onContinue={doApprove}
         recipientName={recipientName}
         amount={potAmount}
       />
@@ -347,6 +420,7 @@ function CustodianActionCard({
   gas,
   status,
   web3Disabled,
+  blockReason,
   onSign,
 }) {
   return (
@@ -389,9 +463,10 @@ function CustodianActionCard({
         className="mt-4 w-full bg-[#FFC107] text-[#1A1A1A] hover:bg-[#F0B400]"
         size="lg"
         disabled={web3Disabled || status === "pending"}
+        title={blockReason ?? undefined}
         onClick={() => {
-          if (web3Disabled) {
-            toast("Connect to Base mainnet first", { variant: "error" });
+          if (blockReason) {
+            toast(blockReason, { variant: "error" });
             return;
           }
           onSign();
@@ -401,6 +476,11 @@ function CustodianActionCard({
           ? "Check your wallet…"
           : "Sign to Approve Payout"}
       </Button>
+      {blockReason ? (
+        <p className="mt-2 text-center text-[11px] text-[#DC2626]">
+          {blockReason}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -8,9 +8,11 @@ import { Web3ContributeSheet } from "@/components/web3/Web3ContributeSheet";
 import { DisbursementSection } from "@/components/web3/DisbursementSection";
 import { ContributeNowSheet } from "@/components/vaults/ContributeNowSheet";
 import { useUser } from "@/hooks/useUser";
+import { useProfile } from "@/hooks/useProfile";
 import { useVaults } from "@/hooks/useVaults";
 import { useOnChainVaultData } from "@/lib/web3/hooks/useOnChainVaultData";
 import { useWalletConnection } from "@/lib/web3/hooks/useWalletConnection";
+import { canContribute } from "@/lib/vaultGuards";
 import {
   cn,
   getTrustScore,
@@ -25,9 +27,10 @@ const STATUS_META = {
 
 export function OverviewTab({ vault }) {
   const { user } = useUser();
+  const { profile } = useProfile();
   const { markContribution } = useVaults();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { isConnected, isBase } = useWalletConnection();
+  const { isConnected, isBase, address } = useWalletConnection();
   const chain = useOnChainVaultData(vault.contractAddress);
 
   const isUsdcVault =
@@ -51,6 +54,12 @@ export function OverviewTab({ vault }) {
 
   const web3Ready = isUsdcVault && isConnected && isBase;
 
+  const contributeGuard = isUsdcVault
+    ? canContribute(vault, profile, address, {
+        alreadyContributed: paidOnChain,
+      })
+    : { allowed: true };
+
   const confirmPayment = () => {
     if (!userMember) return;
     markContribution(vault.id, userMember.id, vault.currentRound, "paid");
@@ -67,15 +76,27 @@ export function OverviewTab({ vault }) {
   return (
     <div className="space-y-5">
       {showContributeButton ? (
-        <Button
-          type="button"
-          size="lg"
-          className="w-full"
-          onClick={() => setSheetOpen(true)}
-          disabled={isUsdcVault && !web3Ready}
-        >
-          Contribute Now
-        </Button>
+        <div className="space-y-1">
+          <Button
+            type="button"
+            size="lg"
+            className="w-full"
+            onClick={() => setSheetOpen(true)}
+            disabled={isUsdcVault && (!web3Ready || !contributeGuard.allowed)}
+            title={
+              isUsdcVault && !contributeGuard.allowed
+                ? contributeGuard.reason
+                : undefined
+            }
+          >
+            Contribute Now
+          </Button>
+          {isUsdcVault && !contributeGuard.allowed && web3Ready ? (
+            <p className="text-center text-[11px] text-[#DC2626]">
+              {contributeGuard.reason}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {isUsdcVault && !isConnected ? (
