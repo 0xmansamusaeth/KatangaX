@@ -130,7 +130,7 @@ export default function DashboardPage() {
     : `Hi, ${firstName} 👋`;
 
   return (
-    <PageWrapper>
+    <PageWrapper reserveFab>
       <PullIndicator pull={pull} refreshing={refreshing} threshold={threshold} />
       <div
         style={{
@@ -167,7 +167,6 @@ export default function DashboardPage() {
           nextPayoutAmount={nextPayoutAmount}
           nextPayoutVaultName={nextPayoutVaultName}
           activeVaultCount={activeVaultCount}
-          currency={user.currency}
         />
       </div>
 
@@ -235,7 +234,6 @@ export default function DashboardPage() {
                 key={p.id}
                 payment={p}
                 vaultColor={vaultColorById[p.vaultId]}
-                currency={user.currency}
               />
             ))
           )}

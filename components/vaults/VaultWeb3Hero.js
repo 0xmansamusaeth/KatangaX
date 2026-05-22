@@ -4,12 +4,7 @@ import Link from "next/link";
 import { Copy, ExternalLink } from "lucide-react";
 import { VerifiedContractBadge } from "@/components/web3/VerifiedContractBadge";
 import { useOnChainVaultData } from "@/lib/web3/hooks/useOnChainVaultData";
-import {
-  basescanAddressUrl,
-  truncateAddress,
-  usdcToZmwEstimate,
-} from "@/lib/web3/utils";
-import { formatCurrency } from "@/lib/utils";
+import { basescanAddressUrl, truncateAddress } from "@/lib/web3/utils";
 import { toast } from "@/components/ui/toast";
 
 /**
@@ -28,10 +23,6 @@ export function VaultWeb3Hero({ vault }) {
       toast("Could not copy", { variant: "error" });
     }
   };
-
-  const zmwEst = usdcToZmwEstimate(
-    Number(vault.contributionAmount ?? 0) * (chain.memberCount || 1),
-  );
 
   return (
     <div className="mt-3 flex w-full flex-col items-center gap-2">
@@ -65,9 +56,6 @@ export function VaultWeb3Hero({ vault }) {
       {chain.usdcBalance > 0n ? (
         <p className="text-[11px] text-[#6B7280]">
           Vault holds {chain.usdcBalanceFormatted}
-          {zmwEst > 0 ? (
-            <span> · ~{formatCurrency(zmwEst)} equivalent</span>
-          ) : null}
         </p>
       ) : null}
 

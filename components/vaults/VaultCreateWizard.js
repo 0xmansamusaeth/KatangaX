@@ -39,8 +39,9 @@ import {
   parseUsdc,
   truncateAddress,
 } from "@/lib/web3/utils";
+import { validateUsdcAmount } from "@/lib/validation";
 import {
-  formatCurrency,
+  formatUSDC,
   formatDate,
   getInitials,
   getPeriodLabel,
@@ -60,12 +61,6 @@ const FREQUENCY_OPTIONS = [
 ];
 
 const PAYMENT_METHODS = [
-  {
-    value: "mobile_money",
-    emoji: "💳",
-    label: "Mobile Money",
-    description: "MTN, Airtel Money",
-  },
   {
     value: "usdc",
     emoji: "🔷",
@@ -98,7 +93,6 @@ const PAYOUT_METHODS = [
 const DESCRIPTION_LIMIT = 200;
 const NAME_MIN = 3;
 const NAME_MAX = 40;
-const AMOUNT_MIN = 10;
 const MEMBERS_MIN = 2;
 const MEMBERS_MAX = 20;
 
@@ -121,13 +115,12 @@ function getFieldErrors(form, today) {
   else if (trimmed.length > NAME_MAX)
     errs.name = `Keep it under ${NAME_MAX} characters.`;
 
-  const amt = Number(form.amount);
   if (form.amount === "" || form.amount === null || form.amount === undefined)
     errs.amount = "Contribution amount is required.";
-  else if (!Number.isFinite(amt) || amt <= 0)
-    errs.amount = "Enter a valid amount.";
-  else if (amt < AMOUNT_MIN)
-    errs.amount = `Minimum contribution is ZMW ${AMOUNT_MIN}.`;
+  else {
+    const usdcErr = validateUsdcAmount(form.amount);
+    if (usdcErr) errs.amount = usdcErr;
+  }
 
   const m = Number(form.memberCount);
   if (!Number.isFinite(m) || m < MEMBERS_MIN || m > MEMBERS_MAX)
@@ -154,7 +147,7 @@ export function VaultCreateWizard() {
     amount: "",
     frequency: "month",
     memberCount: 10,
-    paymentMethod: "mobile_money",
+    paymentMethod: "usdc",
     payoutMethod: "random",
     // Initialized client-side in the effect below to avoid SSR/CSR
     // timezone drift on `todayIsoDate()`.
@@ -614,7 +607,7 @@ function StepDetails({
         <Label htmlFor="vault-amount">Contribution Amount</Label>
         <div className="relative">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#1B5E20]">
-            {form.paymentMethod === "usdc" ? "USDC" : "ZMW"}
+            USDC
           </span>
           <Input
             id="vault-amount"
@@ -622,7 +615,7 @@ function StepDetails({
             value={form.amount}
             onChange={(e) => onChange({ amount: e.target.value })}
             onBlur={() => onBlur("amount")}
-            placeholder="500"
+            placeholder="0.1"
             className="pl-14"
             aria-invalid={Boolean(showErr("amount"))}
             aria-describedby={showErr("amount") ? "vault-amount-err" : undefined}
@@ -972,11 +965,7 @@ function StepReview({
         />
         <SummaryRow
           label="Contribution"
-          value={
-            form.paymentMethod === "usdc"
-              ? `${form.amount || 0} USDC · ${getPeriodLabel(form.frequency)}`
-              : `${formatCurrency(Number(form.amount) || 0)} · ${getPeriodLabel(form.frequency)}`
-          }
+          value={`${formatUSDC(form.amount || 0)} · ${getPeriodLabel(form.frequency)}`}
         />
         <SummaryRow
           label="Members"

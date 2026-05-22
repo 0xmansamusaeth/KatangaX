@@ -1,30 +1,26 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { formatUSDC } from "@/lib/utils";
 
-export function ContributionHistory({ history, currency = "ZMW" }) {
-  if (!history?.length) return null;
+export function ContributionHistory({ history }) {
+  if (!history?.length) {
+    return (
+      <p className="text-sm text-[#6B7280]">No contribution history yet.</p>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Recent contributions</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {history.map((h) => (
-          <div
-            key={h.period}
-            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2"
-          >
-            <div>
-              <p className="text-sm font-medium text-text-primary">{h.period}</p>
-              <p className="text-xs text-text-secondary">
-                Collected {formatCurrency(h.totalCollected, currency)} · Expected{" "}
-                {formatCurrency(h.expectedTotal, currency)}
-              </p>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <ul className="space-y-2">
+      {history.map((h) => (
+        <li
+          key={h.round}
+          className="rounded-xl border border-border bg-white p-3 text-sm"
+        >
+          <p className="font-medium text-[#1A1A1A]">Round {h.round}</p>
+          <p className="mt-0.5 text-xs text-[#6B7280]">
+            Collected {formatUSDC(h.totalCollected)} · Expected{" "}
+            {formatUSDC(h.expectedTotal)}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
 }

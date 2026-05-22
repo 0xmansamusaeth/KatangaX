@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatCurrency } from "@/lib/utils";
+import { formatUSDC } from "@/lib/utils";
 
 const statusClass = {
   active:
@@ -80,7 +80,7 @@ export function DashboardVaultCard({ vault, nextDueDate }) {
 
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#F3F4F6] pt-3">
         <p className="text-sm font-semibold text-[#1A1A1A]">
-          Next: {formatCurrency(vault.contributionAmount, "ZMW")}
+          Next: {formatUSDC(vault.contributionAmount)}
         </p>
         {nextDueDate ? (
           <span className="rounded-full bg-[#F5F7F5] px-2.5 py-1 text-[10px] font-medium text-[#4B5563]">

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useMounted } from "@/hooks/useMounted";
-import { formatCurrency, formatDate, isDueDateOverdue } from "@/lib/utils";
+import { formatUSDC, formatDate, isDueDateOverdue } from "@/lib/utils";
 
-export function UpcomingPaymentItem({ payment, vaultColor, currency = "ZMW" }) {
+export function UpcomingPaymentItem({ payment, vaultColor }) {
   // `isDueDateOverdue` uses `new Date()`, so the resulting className/Badge
   // would differ between SSR (UTC) and the client (local TZ). Defer to mount.
   const mounted = useMounted();
@@ -47,7 +47,7 @@ export function UpcomingPaymentItem({ payment, vaultColor, currency = "ZMW" }) {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <p className="text-sm font-bold text-[#1A1A1A]">
-            {formatCurrency(payment.amount, currency)}
+            {formatUSDC(payment.amount)}
           </p>
           <Link
             href="/payments"

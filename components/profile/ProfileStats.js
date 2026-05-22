@@ -1,5 +1,5 @@
 import { Landmark, PiggyBank, Star, TrendingDown } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatUSDC } from "@/lib/utils";
 
 /**
  * @param {{
@@ -7,7 +7,6 @@ import { formatCurrency } from "@/lib/utils";
  *   totalSaved: number,
  *   totalReceived: number,
  *   reliabilityPct: number,
- *   currency?: string,
  * }} props
  */
 export function ProfileStats({
@@ -15,7 +14,6 @@ export function ProfileStats({
   totalSaved,
   totalReceived,
   reliabilityPct,
-  currency = "ZMW",
 }) {
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -28,14 +26,14 @@ export function ProfileStats({
       />
       <StatCard
         label="Total Saved"
-        value={formatCurrency(totalSaved, currency)}
+        value={formatUSDC(totalSaved)}
         Icon={PiggyBank}
         iconColor="text-[#16A34A]"
         iconBg="bg-[#16A34A]/10"
       />
       <StatCard
         label="Total Received"
-        value={formatCurrency(totalReceived, currency)}
+        value={formatUSDC(totalReceived)}
         Icon={TrendingDown}
         iconColor="text-[#92400E]"
         iconBg="bg-[#FFC107]/25"

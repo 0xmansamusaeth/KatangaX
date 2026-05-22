@@ -9,7 +9,7 @@ import { PaymentDueCard } from "@/components/payments/PaymentDueCard";
 import { PaymentHistoryRow } from "@/components/payments/PaymentHistoryRow";
 import { useMounted } from "@/hooks/useMounted";
 import { usePayments } from "@/hooks/usePayments";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatUSDC } from "@/lib/utils";
 
 const TABS = [
   { value: "due", label: "Due" },
@@ -103,12 +103,12 @@ function HistoryTab({ items, filter, onFilterChange, totals, ready }) {
       <div className="grid grid-cols-2 gap-2">
         <StatBox
           label="Total Contributed"
-          value={`${Number(totals.contributed).toFixed(2)} USDC`}
+          value={formatUSDC(totals.contributed)}
           tone="muted"
         />
         <StatBox
           label="Total Received"
-          value={`${Number(totals.received).toFixed(2)} USDC`}
+          value={formatUSDC(totals.received)}
           tone="accent"
         />
       </div>

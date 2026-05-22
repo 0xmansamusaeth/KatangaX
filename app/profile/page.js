@@ -55,7 +55,6 @@ export default function ProfilePage() {
           totalSaved={stats.totalContributed}
           totalReceived={stats.totalReceived}
           reliability={stats.reliability}
-          currency="USDC"
         />
 
         {stats.custodianOf > 0 ? (

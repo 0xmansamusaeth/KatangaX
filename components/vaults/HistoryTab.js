@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, XCircle } from "lucide-react";
 import { OnChainHistoryList } from "@/components/vaults/OnChainHistoryList";
 import { useUser } from "@/hooks/useUser";
 import {
-  formatCurrency,
+  formatUSDC,
   formatDate,
   getRoundDateRange,
   resolveMemberDisplay,
@@ -94,7 +94,7 @@ function MockHistoryTab({ vault }) {
                   ) : null}
                 </div>
                 <p className="text-sm font-bold text-[#1B5E20]">
-                  {formatCurrency(pot)}
+                  {formatUSDC(pot)}
                 </p>
               </div>
 

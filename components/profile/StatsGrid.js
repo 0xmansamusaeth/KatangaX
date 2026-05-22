@@ -1,5 +1,5 @@
 import { Star } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatUSDC } from "@/lib/utils";
 
 /**
  * @param {{
@@ -7,29 +7,19 @@ import { formatCurrency } from "@/lib/utils";
  *   totalSaved: number,
  *   totalReceived: number,
  *   reliability: number,
- *   currency?: string,
  * }} props
  */
-function formatAmount(amount, currency) {
-  if (currency === "USDC") return `${Number(amount ?? 0).toFixed(2)} USDC`;
-  return formatCurrency(amount, currency);
-}
-
 export function StatsGrid({
   vaultsJoined,
   totalSaved,
   totalReceived,
   reliability,
-  currency = "ZMW",
 }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       <StatCard label="Vaults Joined" value={`${vaultsJoined}`} />
-      <StatCard label="Total Saved" value={formatAmount(totalSaved, currency)} accent />
-      <StatCard
-        label="Total Received"
-        value={formatAmount(totalReceived, currency)}
-      />
+      <StatCard label="Total Saved" value={formatUSDC(totalSaved)} accent />
+      <StatCard label="Total Received" value={formatUSDC(totalReceived)} />
       <StatCard
         label="Reliability Score"
         value={`${reliability}%`}

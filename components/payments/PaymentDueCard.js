@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatUSDC, formatDate } from "@/lib/utils";
 
 /**
  * @param {{
@@ -53,7 +53,7 @@ export function PaymentDueCard({ item, onPay }) {
               </p>
             </div>
             <p className="shrink-0 text-right text-lg font-bold text-[#1A1A1A]">
-              {formatCurrency(item.amount)}
+              {formatUSDC(item.amount)}
             </p>
           </div>
           <Button

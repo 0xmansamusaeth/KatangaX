@@ -20,7 +20,7 @@ import { useUser } from "@/hooks/useUser";
 import { useVaults } from "@/hooks/useVaults";
 import { useVaultRealtime } from "@/hooks/useVaultRealtime";
 import {
-  formatCurrency,
+  formatUSDC,
   formatDate,
   getPeriodLabel,
   getRoundDateRange,
@@ -189,7 +189,7 @@ export default function VaultDetailPage() {
         </CircularProgressRing>
 
         <p className="mt-4 text-sm font-semibold text-[#1A1A1A]">
-          {formatCurrency(pot)} pot this round
+          {formatUSDC(pot)} pot this round
         </p>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
@@ -205,10 +205,8 @@ export default function VaultDetailPage() {
             </span>
           ) : null}
           <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#4B5563] shadow-sm">
-            {vault.paymentMethod === "usdc"
-              ? `${vault.contributionAmount} USDC`
-              : formatCurrency(vault.contributionAmount)}{" "}
-            · {getPeriodLabel(vault.contributionPeriod)}
+            {formatUSDC(vault.contributionAmount)} ·{" "}
+            {getPeriodLabel(vault.contributionPeriod)}
           </span>
         </div>
 

@@ -3,7 +3,7 @@
 import { CheckCircle2, Clock } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import {
-  formatCurrency,
+  formatUSDC,
   formatDate,
   getPeriodLabel,
   resolveMemberDisplay,
@@ -38,7 +38,7 @@ export function RulesTab({ vault }) {
         <dl className="mt-3 divide-y divide-[#F3F4F6]">
           <RuleRow
             label="Amount"
-            value={formatCurrency(vault.contributionAmount)}
+            value={formatUSDC(vault.contributionAmount)}
           />
           <RuleRow
             label="Frequency"

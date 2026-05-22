@@ -2,7 +2,7 @@
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, getPeriodLabel } from "@/lib/utils";
+import { formatUSDC, getPeriodLabel } from "@/lib/utils";
 
 /**
  * @param {{
@@ -49,7 +49,7 @@ export function ContributeNowSheet({ open, onClose, vault, onConfirm }) {
             Amount due
           </p>
           <p className="mt-1 text-2xl font-bold text-[#1A1A1A]">
-            {formatCurrency(vault.contributionAmount)}
+            {formatUSDC(vault.contributionAmount)}
           </p>
         </div>
 
@@ -59,7 +59,7 @@ export function ContributeNowSheet({ open, onClose, vault, onConfirm }) {
           onClick={onConfirm}
           size="lg"
         >
-          Confirm Payment of {formatCurrency(vault.contributionAmount)}
+          Confirm Payment of {formatUSDC(vault.contributionAmount)}
         </Button>
         <p className="text-center text-[11px] text-[#6B7280]">
           You can dispute any contribution within 24 hours of confirmation.

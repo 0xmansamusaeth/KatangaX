@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { formatUSDC } from "@/lib/utils";
 
-export function DashboardStats({ activeVaults, monthlyOut, currency = "ZMW" }) {
+export function DashboardStats({ activeVaults, monthlyOut }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <Card>
@@ -16,7 +16,7 @@ export function DashboardStats({ activeVaults, monthlyOut, currency = "ZMW" }) {
         <CardContent className="p-4">
           <p className="text-xs text-text-secondary">Scheduled out (month)</p>
           <p className="mt-1 text-2xl font-semibold text-text-primary">
-            {formatCurrency(monthlyOut, currency)}
+            {formatUSDC(monthlyOut)}
           </p>
         </CardContent>
       </Card>

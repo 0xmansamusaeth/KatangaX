@@ -3,7 +3,7 @@
 import { Smartphone } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, getPeriodLabel } from "@/lib/utils";
+import { formatUSDC, getPeriodLabel } from "@/lib/utils";
 
 /**
  * @param {{
@@ -58,7 +58,7 @@ export function PaymentConfirmSheet({ isOpen, onClose, payment, onConfirm }) {
             Amount due
           </p>
           <p className="mt-1 text-2xl font-bold text-[#1A1A1A]">
-            {formatCurrency(payment.amount)}
+            {formatUSDC(payment.amount)}
           </p>
         </div>
 

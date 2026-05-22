@@ -97,7 +97,7 @@ export function usePayments() {
         memberCount: v.memberCount,
         round: v.currentRound,
         amount: v.contributionAmount,
-        currency: v.paymentMethod === "usdc" ? "USDC" : "ZMW",
+        currency: "USDC",
         dueDate: v.startDate || new Date().toISOString().slice(0, 10),
         overdueDays: 0,
       });
@@ -119,7 +119,7 @@ export function usePayments() {
         date: c.contributed_at ?? c.created_at ?? null,
         status: c.status === "confirmed" ? "paid" : c.status,
         txHash: c.tx_hash ?? null,
-        currency: c.vaults?.payment_method === "usdc" ? "USDC" : "ZMW",
+        currency: "USDC",
       });
     }
     for (const d of activity.disbursements) {
@@ -134,7 +134,7 @@ export function usePayments() {
         date: d.disbursed_at ?? d.created_at ?? null,
         status: "received",
         txHash: d.tx_hash ?? null,
-        currency: d.vaults?.payment_method === "usdc" ? "USDC" : "ZMW",
+        currency: "USDC",
       });
     }
     return items.sort((a, b) => {

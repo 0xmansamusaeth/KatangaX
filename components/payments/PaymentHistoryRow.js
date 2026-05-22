@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, ExternalLink } from "lucide-react";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatUSDC, formatDate } from "@/lib/utils";
 import { basescanTxUrl } from "@/lib/web3/utils";
 
 const STATUS_VARIANTS = {
@@ -41,10 +41,7 @@ export function PaymentHistoryRow({ item }) {
     ? "text-[#1B5E20]"
     : "text-[#4B5563]";
   const explorerUrl = item.txHash ? basescanTxUrl(item.txHash) : null;
-  const amountLabel =
-    item.currency === "USDC"
-      ? `${Number(item.amount).toFixed(2)} USDC`
-      : formatCurrency(item.amount);
+  const amountLabel = formatUSDC(item.amount);
 
   return (
     <li className="flex items-center gap-3 rounded-xl border border-border bg-white p-3 shadow-sm">

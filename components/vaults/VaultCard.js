@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Landmark, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { formatUSDC } from "@/lib/utils";
 
 const statusVariant = {
   active: "success",
@@ -29,7 +29,7 @@ export function VaultCard({ vault }) {
                 {vault.name}
               </p>
               <p className="text-sm text-text-secondary">
-                {formatCurrency(vault.contributionAmount, "ZMW")} ·{" "}
+                {formatUSDC(vault.contributionAmount)} ·{" "}
                 {vault.contributionPeriod === "week" ? "Weekly" : "Monthly"}
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
