@@ -12,7 +12,6 @@ import {
   Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -155,7 +154,6 @@ export function VaultCreateWizard() {
     description: "",
   });
   const [addedMembers, setAddedMembers] = useState(/** @type {any[]} */ ([]));
-  const [agreed, setAgreed] = useState(false);
   const [showMismatch, setShowMismatch] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState("");
@@ -327,11 +325,6 @@ export function VaultCreateWizard() {
   };
 
   const submit = async () => {
-    if (!agreed) {
-      toast("Please accept the Vault Terms to continue", { variant: "error" });
-      return;
-    }
-
     if (form.paymentMethod === "usdc") {
       if (!isConnected || !isBase || !address) {
         toast("Connect your Base wallet first", { variant: "error" });
@@ -431,8 +424,6 @@ export function VaultCreateWizard() {
           form={form}
           addedMembers={addedMembers}
           user={user}
-          agreed={agreed}
-          onAgreed={setAgreed}
           onEditStep={setStep}
           deploying={deploying}
           deployStatus={deployStatus}
@@ -467,7 +458,7 @@ export function VaultCreateWizard() {
             type="button"
             className="flex-1 gap-1"
             onClick={submit}
-            disabled={!agreed || deploying}
+            disabled={deploying}
           >
             <CheckCircle2 className="h-4 w-4" />
             {deploying ? "Deploying…" : "Create Vault"}
@@ -912,8 +903,6 @@ function StepReview({
   form,
   addedMembers,
   user,
-  agreed,
-  onAgreed,
   onEditStep,
   deploying,
   deployStatus,
@@ -998,24 +987,6 @@ function StepReview({
           ))}
         </div>
       </SummaryCard>
-
-      <label
-        className="flex items-start gap-3 rounded-xl border border-border bg-white p-3"
-        htmlFor="agree-terms"
-      >
-        <Checkbox
-          id="agree-terms"
-          checked={agreed}
-          onCheckedChange={onAgreed}
-        />
-        <span className="text-sm leading-snug text-[#1A1A1A]">
-          I agree to the{" "}
-          <span className="font-semibold text-[#1B5E20]">
-            KatangaX Vault Terms
-          </span>
-          .
-        </span>
-      </label>
     </div>
   );
 }
