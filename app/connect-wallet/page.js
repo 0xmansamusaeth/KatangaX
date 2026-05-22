@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
@@ -32,10 +32,21 @@ const WALLET_OPTIONS = [
 ];
 
 export default function ConnectWalletPage() {
+  return (
+    <Suspense fallback={null}>
+      <ConnectWalletPageInner />
+    </Suspense>
+  );
+}
+
+function ConnectWalletPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile, updateProfile, loading } = useProfile();
   const { address, isConnected } = useWalletConnection();
   const [saved, setSaved] = useState(false);
+
+  const next = useMemo(() => searchParams.get("next") || "/dashboard", [searchParams]);
 
   useEffect(() => {
     if (!isConnected || !address || saved || loading) return;
@@ -53,10 +64,6 @@ export default function ConnectWalletPage() {
       toast("Wallet connected!", { variant: "success" });
     })();
   }, [isConnected, address, saved, loading, updateProfile]);
-
-  if (profile?.walletAddress && !isConnected) {
-    router.replace("/dashboard");
-  }
 
   return (
     <main className="min-h-screen px-6 pb-24 pt-8">
@@ -114,9 +121,9 @@ export default function ConnectWalletPage() {
           <Button
             className="mt-4 w-full"
             size="lg"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push(next)}
           >
-            Continue to Dashboard →
+            Continue →
           </Button>
         </div>
       ) : null}
@@ -124,7 +131,7 @@ export default function ConnectWalletPage() {
       <button
         type="button"
         className="mt-8 w-full text-center text-xs text-[#6B7280] underline"
-        onClick={() => router.push("/dashboard")}
+        onClick={() => router.push(next)}
       >
         Skip for now — I&apos;ll connect later
       </button>

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Bell, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { useNotifications } from "@/hooks/useNotifications";
 
 export function Header({
@@ -13,6 +15,7 @@ export function Header({
   settingsHref = "/profile",
 }) {
   const router = useRouter();
+  const { isAuthenticated } = useAuthGuard();
   const { unreadCount } = useNotifications();
 
   return (
@@ -35,29 +38,42 @@ export function Header({
           </h1>
 
           <div className="absolute right-2 flex items-center gap-0.5">
-            {showNotification ? (
-              <Link
-                href="/notifications"
-                className="relative flex h-10 w-10 items-center justify-center rounded-full text-[#1A1A1A] transition-colors hover:bg-[#F5F7F5]"
-                aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+            {!isAuthenticated ? (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="border-[#1B5E20] text-[#1B5E20] hover:bg-[#1B5E20]/5"
               >
-                <Bell className="h-5 w-5" strokeWidth={1.75} />
-                {unreadCount > 0 ? (
-                  <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#DC2626] px-1 text-[10px] font-bold leading-none text-white">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
+                <Link href="/auth?tab=signin">Sign in</Link>
+              </Button>
+            ) : (
+              <>
+                {showNotification ? (
+                  <Link
+                    href="/notifications"
+                    className="relative flex h-10 w-10 items-center justify-center rounded-full text-[#1A1A1A] transition-colors hover:bg-[#F5F7F5]"
+                    aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+                  >
+                    <Bell className="h-5 w-5" strokeWidth={1.75} />
+                    {unreadCount > 0 ? (
+                      <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#DC2626] px-1 text-[10px] font-bold leading-none text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    ) : null}
+                  </Link>
                 ) : null}
-              </Link>
-            ) : null}
-            {showSettings ? (
-              <Link
-                href={settingsHref}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-[#1A1A1A] transition-colors hover:bg-[#F5F7F5]"
-                aria-label="Settings"
-              >
-                <Settings className="h-5 w-5" strokeWidth={1.75} />
-              </Link>
-            ) : null}
+                {showSettings ? (
+                  <Link
+                    href={settingsHref}
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-[#1A1A1A] transition-colors hover:bg-[#F5F7F5]"
+                    aria-label="Settings"
+                  >
+                    <Settings className="h-5 w-5" strokeWidth={1.75} />
+                  </Link>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
       </div>

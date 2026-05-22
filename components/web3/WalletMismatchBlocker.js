@@ -11,7 +11,12 @@ import { useProfile } from "@/hooks/useProfile";
 import { useWalletConnection } from "@/lib/web3/hooks/useWalletConnection";
 import { truncateAddress } from "@/lib/web3/utils";
 
-const EXEMPT_PATHS = ["/onboarding", "/connect-wallet", "/auth/callback"];
+const EXEMPT_PATHS = [
+  "/onboarding",
+  "/connect-wallet",
+  "/auth",
+  "/create-profile",
+];
 
 function sameAddress(a, b) {
   if (!a || !b) return false;

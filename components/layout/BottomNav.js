@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CreditCard, House, Landmark, User } from "lucide-react";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -12,14 +13,22 @@ const tabs = [
   { href: "/profile", label: "Profile", Icon: User },
 ];
 
+const HIDDEN_PREFIXES = [
+  "/auth",
+  "/create-profile",
+  "/connect-wallet",
+  "/onboarding",
+];
+
 export function BottomNav() {
   const pathname = usePathname();
+  const { isAuthenticated, isLoading } = useAuthGuard();
 
-  if (
-    pathname === "/onboarding" ||
-    pathname.startsWith("/onboarding/") ||
-    pathname === "/connect-wallet"
-  ) {
+  if (HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return null;
+  }
+
+  if (isLoading || !isAuthenticated) {
     return null;
   }
 

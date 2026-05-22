@@ -38,7 +38,7 @@ export default function ProfilePage() {
     const supabase = createClient();
     await supabase.auth.signOut();
     toast("Signed out", { variant: "info" });
-    router.push("/onboarding");
+    router.push("/dashboard");
   };
 
   return (

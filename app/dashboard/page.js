@@ -9,9 +9,11 @@ import { DashboardVaultCard } from "@/components/dashboard/DashboardVaultCard";
 import { UpcomingPaymentItem } from "@/components/dashboard/UpcomingPaymentItem";
 import { FloatingNewVaultButton } from "@/components/dashboard/FloatingNewVaultButton";
 import { PullIndicator } from "@/components/dashboard/PullIndicator";
+import { GuestDashboard } from "@/components/dashboard/GuestDashboard";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { useMounted } from "@/hooks/useMounted";
 import { useNotifications } from "@/hooks/useNotifications";
 import { usePayments } from "@/hooks/usePayments";
@@ -53,6 +55,7 @@ function minDueDateForVault(vaultId, payments) {
 }
 
 export default function DashboardPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuthGuard();
   const { user } = useUser();
   const { vaults, refetch: refetchVaults, loading: vaultsLoading } = useVaults();
   const { payments, refetch: refetchPayments } = usePayments();
@@ -71,14 +74,6 @@ export default function DashboardPage() {
   const { pull, refreshing, threshold } = usePullToRefresh({
     onRefresh: handleRefresh,
   });
-
-  const firstName = user.name.split(" ")[0];
-  // `getTimeBasedGreeting` reads `new Date().getHours()`, which differs
-  // between the SSR (UTC) host and the user's local browser. Defer to
-  // post-mount so the first paint is deterministic.
-  const greeting = mounted
-    ? getTimeBasedGreeting(firstName)
-    : `Hi, ${firstName} 👋`;
 
   const totalSaved = useMemo(() => sumTotalSaved(vaults), [vaults]);
   const { amount: nextPayoutAmount, vaultName: nextPayoutVaultName } =
@@ -115,6 +110,24 @@ export default function DashboardPage() {
     });
     return map;
   }, [vaults, payments]);
+
+  if (authLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F7F5]" />
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <GuestDashboard />;
+  }
+
+  const firstName = (user.name || "there").split(" ")[0];
+  // `getTimeBasedGreeting` reads `new Date().getHours()`, which differs
+  // between the SSR (UTC) host and the user's local browser. Defer to
+  // post-mount so the first paint is deterministic.
+  const greeting = mounted
+    ? getTimeBasedGreeting(firstName)
+    : `Hi, ${firstName} 👋`;
 
   return (
     <PageWrapper>

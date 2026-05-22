@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
 import { sanitizeMessage } from "@/lib/validation";
 import { cn } from "@/lib/utils";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 const CATEGORIES = [
   { value: "bug", label: "Bug" },
@@ -16,16 +17,23 @@ const CATEGORIES = [
   { value: "compliment", label: "Compliment" },
 ];
 
-const HIDDEN_PATHS = ["/onboarding", "/connect-wallet", "/auth/callback"];
+const HIDDEN_PATHS = [
+  "/onboarding",
+  "/connect-wallet",
+  "/auth",
+  "/create-profile",
+];
 
 export function FeedbackWidget() {
   const pathname = usePathname() ?? "";
+  const { isAuthenticated } = useAuthGuard();
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);
   const [category, setCategory] = useState("suggestion");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  if (!isAuthenticated) return null;
   if (HIDDEN_PATHS.some((p) => pathname.startsWith(p))) return null;
 
   const reset = () => {

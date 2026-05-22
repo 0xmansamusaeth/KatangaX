@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/toast";
 import { Web3ContributeSheet } from "@/components/web3/Web3ContributeSheet";
 import { DisbursementSection } from "@/components/web3/DisbursementSection";
 import { ContributeNowSheet } from "@/components/vaults/ContributeNowSheet";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { useUser } from "@/hooks/useUser";
 import { useProfile } from "@/hooks/useProfile";
 import { useVaults } from "@/hooks/useVaults";
@@ -29,6 +30,7 @@ export function OverviewTab({ vault }) {
   const { user } = useUser();
   const { profile } = useProfile();
   const { markContribution } = useVaults();
+  const { isAuthenticated, requireAuth } = useAuthGuard();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { isConnected, isBase, address } = useWalletConnection();
   const chain = useOnChainVaultData(vault.contractAddress);
@@ -37,8 +39,11 @@ export function OverviewTab({ vault }) {
     vault.paymentMethod === "usdc" && Boolean(vault.contractAddress);
 
   const userMember = useMemo(
-    () => vault.members?.find((m) => m.userId === user.id) ?? null,
-    [vault, user.id],
+    () =>
+      isAuthenticated
+        ? vault.members?.find((m) => m.userId === user.id) ?? null
+        : null,
+    [vault, user.id, isAuthenticated],
   );
 
   const currentRoundKey = String(vault.currentRound);
@@ -48,17 +53,25 @@ export function OverviewTab({ vault }) {
   const paidOnChain = isUsdcVault && chain.member?.paidThisRound;
   const showContributeButton =
     vault.status === "active" &&
-    userMember &&
+    (!isAuthenticated || userMember) &&
     userStatus !== "paid" &&
     !paidOnChain;
 
   const web3Ready = isUsdcVault && isConnected && isBase;
 
-  const contributeGuard = isUsdcVault
+  const contributeGuard = isUsdcVault && isAuthenticated
     ? canContribute(vault, profile, address, {
         alreadyContributed: paidOnChain,
       })
     : { allowed: true };
+
+  const onContributeClick = () => {
+    if (!isAuthenticated) {
+      requireAuth("contribute");
+      return;
+    }
+    setSheetOpen(true);
+  };
 
   const confirmPayment = () => {
     if (!userMember) return;
@@ -81,17 +94,24 @@ export function OverviewTab({ vault }) {
             type="button"
             size="lg"
             className="w-full"
-            onClick={() => setSheetOpen(true)}
-            disabled={isUsdcVault && (!web3Ready || !contributeGuard.allowed)}
+            onClick={onContributeClick}
+            disabled={
+              isAuthenticated &&
+              isUsdcVault &&
+              (!web3Ready || !contributeGuard.allowed)
+            }
             title={
-              isUsdcVault && !contributeGuard.allowed
+              isAuthenticated && isUsdcVault && !contributeGuard.allowed
                 ? contributeGuard.reason
                 : undefined
             }
           >
             Contribute Now
           </Button>
-          {isUsdcVault && !contributeGuard.allowed && web3Ready ? (
+          {isAuthenticated &&
+          isUsdcVault &&
+          !contributeGuard.allowed &&
+          web3Ready ? (
             <p className="text-center text-[11px] text-[#DC2626]">
               {contributeGuard.reason}
             </p>
@@ -99,7 +119,7 @@ export function OverviewTab({ vault }) {
         </div>
       ) : null}
 
-      {isUsdcVault && !isConnected ? (
+      {isAuthenticated && isUsdcVault && !isConnected ? (
         <p className="text-center text-xs text-[#6B7280]">
           Connect your Base wallet to contribute with USDC.
         </p>
